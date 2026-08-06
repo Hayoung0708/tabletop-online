@@ -1,5 +1,8 @@
 "use client";
 
+import type { JSX } from "react";
+
+/** 주사위 눈(1~6)별로 점을 찍을 3x3 그리드 칸 인덱스 */
 const PIP_POSITIONS: Record<number, number[]> = {
   1: [4],
   2: [2, 6],
@@ -9,19 +12,31 @@ const PIP_POSITIONS: Record<number, number[]> = {
   6: [0, 2, 3, 5, 6, 8],
 };
 
-export function Die({
-  value,
-  held,
-  rolling,
-  onClick,
-  disabled,
-}: {
+export interface DieProps {
   value: number;
   held?: boolean;
   rolling?: boolean;
   onClick?: () => void;
   disabled?: boolean;
-}) {
+}
+
+/**
+ * 클릭해서 홀드를 토글할 수 있는 주사위 한 개.
+ * @param props - 주사위 표시/상호작용 옵션
+ * @param props.value
+ * @param props.held
+ * @param props.rolling
+ * @param props.onClick
+ * @param props.disabled
+ * @returns 주사위 버튼 엘리먼트
+ */
+export const Die = ({
+  value,
+  held,
+  rolling,
+  onClick,
+  disabled,
+}: DieProps): JSX.Element => {
   const pips = PIP_POSITIONS[value] ?? [];
 
   return (
@@ -35,9 +50,7 @@ export function Die({
           ? "-translate-y-1 border-indigo-400 bg-indigo-50 shadow-indigo-500/50"
           : "border-slate-300 bg-white"
       } ${rolling ? "opacity-80" : ""} ${
-        disabled
-          ? "cursor-not-allowed"
-          : "cursor-pointer hover:-translate-y-0.5"
+        disabled ? "cursor-not-allowed" : "cursor-pointer hover:-translate-y-0.5"
       }`}
     >
       {Array.from({ length: 9 }).map((_, i) => (
@@ -53,4 +66,4 @@ export function Die({
       ))}
     </button>
   );
-}
+};

@@ -1,10 +1,11 @@
+import type { JSX } from "react";
 import type { Metadata } from "next";
 import { Geist_Mono } from "next/font/google";
 import localFont from "next/font/local";
 import "./globals.css";
 
 const pretendard = localFont({
-  src: "./fonts/PretendardVariable.woff2",
+  src: "../assets/fonts/PretendardVariable.woff2",
   variable: "--font-pretendard",
   weight: "45 920",
   display: "swap",
@@ -20,7 +21,13 @@ export const metadata: Metadata = {
   description: "친구들과 실시간으로 즐기는 온라인 야찌",
 };
 
-export default function RootLayout({ children }: LayoutProps<"/">) {
+/**
+ * 모든 페이지를 감싸는 루트 레이아웃. 폰트 변수와 공통 배경/텍스트 색을 세팅한다.
+ * @param props - 자식 페이지 엘리먼트
+ * @param props.children
+ * @returns 최상위 html 문서 엘리먼트
+ */
+const RootLayout = ({ children }: LayoutProps<"/">): JSX.Element => {
   return (
     <html
       lang="ko"
@@ -31,4 +38,6 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       </body>
     </html>
   );
-}
+};
+
+export default RootLayout;

@@ -1,7 +1,12 @@
+import type { JSX } from "react";
 import { SiteHeader } from "@/components/SiteHeader";
-import { LobbyClient } from "./LobbyClient";
+import { LobbyClient } from "@/app/lobby/LobbyClient";
 
-export default function LobbyPage() {
+/**
+ * 로비 라우트. 공통 헤더와 로비 화면을 배치한다.
+ * @returns 로비 페이지 엘리먼트
+ */
+const LobbyPage = (): JSX.Element => {
   return (
     <>
       <SiteHeader />
@@ -10,4 +15,6 @@ export default function LobbyPage() {
       </main>
     </>
   );
-}
+};
+
+export default LobbyPage;

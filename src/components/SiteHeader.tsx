@@ -1,9 +1,21 @@
 "use client";
 
+import type { JSX } from "react";
 import Image from "next/image";
 import Link from "next/link";
 
-export function SiteHeader({ onExit }: { onExit?: () => void }) {
+export interface SiteHeaderProps {
+  onExit?: () => void;
+}
+
+/**
+ * 로고 + 제목을 보여주는 공통 헤더. onExit이 있으면(방 안에서는) 로고 클릭도
+ * 나가기 로직(leave_room emit, 진행 중이면 확인 다이얼로그)을 거치도록 만든다.
+ * @param props - onExit 콜백
+ * @param props.onExit
+ * @returns 헤더 엘리먼트
+ */
+export const SiteHeader = ({ onExit }: SiteHeaderProps): JSX.Element => {
   const logo = (
     <>
       <Image src="/logo.svg" alt="" width={40} height={40} />
@@ -14,9 +26,6 @@ export function SiteHeader({ onExit }: { onExit?: () => void }) {
   return (
     <header className="flex items-center justify-between border-b border-slate-800 px-4 py-3 sm:px-6">
       {onExit ? (
-        // Inside a room: route through the same leave logic as the exit
-        // button (leave_room emit, confirm-dialog while playing) instead of
-        // a plain nav that would strand the server-side room membership.
         <button onClick={onExit} className="flex items-center text-lg font-bold">
           {logo}
         </button>
@@ -51,4 +60,4 @@ export function SiteHeader({ onExit }: { onExit?: () => void }) {
       )}
     </header>
   );
-}
+};
