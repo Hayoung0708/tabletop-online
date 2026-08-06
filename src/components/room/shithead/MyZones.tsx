@@ -81,7 +81,7 @@ export const MyZones = ({
 
   return (
     <div className="flex flex-col items-center gap-3 rounded-xl border border-slate-800 bg-slate-900/40 px-4 py-3">
-      <div className="flex items-end gap-2">
+      <div className="flex items-end gap-6">
         <FaceCardSlots
           faceUp={faceUp}
           faceDownCount={faceDownCount}
@@ -90,7 +90,7 @@ export const MyZones = ({
           onToggleFaceUp={hand.length === 0 && isMyTurn ? toggleCard : undefined}
           onFlipFaceDown={isBlindPhase && isMyTurn ? onPlayFaceDown : undefined}
         />
-        <div className="flex -space-x-9">
+        <div className="flex flex-wrap gap-2">
           {hand.map((card) => (
             <PlayingCard
               key={card.id}

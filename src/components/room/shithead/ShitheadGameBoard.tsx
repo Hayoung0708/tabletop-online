@@ -63,12 +63,8 @@ export const ShitheadGameBoard = ({
               ))}
           </div>
 
-          {!allSelected ? (
-            <FaceUpSelection
-              hand={me.hand ?? []}
-              selectionDone={me.selectionDone}
-              onConfirm={selectFaceUp}
-            />
+          {!me.selectionDone ? (
+            <FaceUpSelection hand={me.hand ?? []} onConfirm={selectFaceUp} />
           ) : (
             <>
               <PileAndDeck pile={game.pile} deckCount={game.deckCount} />
@@ -84,7 +80,7 @@ export const ShitheadGameBoard = ({
                 onPickUpPile={pickUpPile}
               />
 
-              {!isMyTurn && (
+              {allSelected && !isMyTurn && (
                 <p className="text-center text-sm text-slate-500">
                   {nicknameOf(game.currentPlayerId ?? "")}님의 차례입니다...
                 </p>

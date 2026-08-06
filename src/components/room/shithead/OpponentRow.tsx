@@ -15,6 +15,7 @@ export interface OpponentRowProps {
 /**
  * 다른 플레이어 한 명의 카드 상태. 바닥패는 왼쪽에 겹치지 않게, 손패는
  * 그 오른쪽에 뒷면으로 겹쳐서 보여준다 (얼굴카드/손패 실제 개수만 공개됨).
+ * 바닥패 선택 단계에는 닉네임 옆에 완료/진행중 아이콘을 보여준다.
  * @param props - 닉네임과 공개된 카드 상태
  * @param props.nickname
  * @param props.player
@@ -41,9 +42,20 @@ export const OpponentRow = ({
             {player.finishRank}등
           </span>
         )}
+        {showSelectionStatus &&
+          (player.selectionDone ? (
+            <span className="text-emerald-400" title="바닥패 선택 완료">
+              ✅
+            </span>
+          ) : (
+            <span
+              className="h-3 w-3 animate-spin rounded-full border-2 border-slate-600 border-t-slate-300"
+              title="바닥패 선택중..."
+            />
+          ))}
       </div>
 
-      <div className="flex items-end gap-2">
+      <div className="flex items-end gap-6">
         <FaceCardSlots faceUp={player.faceUp} faceDownCount={player.faceDownCount} />
         <div className="flex -space-x-9">
           {Array.from({ length: player.handCount }, (_, i) => (
@@ -51,14 +63,6 @@ export const OpponentRow = ({
           ))}
         </div>
       </div>
-
-      {showSelectionStatus && (
-        <p
-          className={`text-xs ${player.selectionDone ? "text-emerald-400" : "text-slate-500"}`}
-        >
-          {player.selectionDone ? "✅ 바닥패 선택 완료" : "바닥패 선택중..."}
-        </p>
-      )}
     </div>
   );
 };
