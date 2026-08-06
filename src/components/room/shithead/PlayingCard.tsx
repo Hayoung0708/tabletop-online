@@ -40,13 +40,15 @@ export const PlayingCard = ({
   onClick,
   disabled,
 }: PlayingCardProps): JSX.Element => {
+  const disabledClass = disabled ? "opacity-30 grayscale contrast-75" : "";
+
   if (faceDown || !card) {
     return (
       <button
         type="button"
         onClick={onClick}
         disabled={disabled || !onClick}
-        className={`${CARD_BASE_CLASS} border-indigo-700 bg-indigo-900 bg-[repeating-linear-gradient(45deg,theme(colors.indigo.800),theme(colors.indigo.800)_4px,theme(colors.indigo.900)_4px,theme(colors.indigo.900)_8px)] ${
+        className={`${CARD_BASE_CLASS} border-indigo-700 bg-indigo-900 bg-[repeating-linear-gradient(45deg,theme(colors.indigo.800),theme(colors.indigo.800)_4px,theme(colors.indigo.900)_4px,theme(colors.indigo.900)_8px)] ${disabledClass} ${
           onClick && !disabled ? "cursor-pointer hover:-translate-y-1" : "cursor-default"
         }`}
       />
@@ -60,7 +62,7 @@ export const PlayingCard = ({
       type="button"
       onClick={onClick}
       disabled={disabled || !onClick}
-      className={`${CARD_BASE_CLASS} bg-white ${isRed ? "text-red-600" : "text-slate-900"} ${
+      className={`${CARD_BASE_CLASS} bg-white ${isRed ? "text-red-600" : "text-slate-900"} ${disabledClass} ${
         selected
           ? "-translate-y-2 border-indigo-400 shadow-indigo-500/50"
           : "border-slate-300"
