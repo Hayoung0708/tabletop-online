@@ -75,7 +75,7 @@ export const CreateRoomDialog = ({
           <input
             value={form.roomName}
             onChange={(e) => form.setRoomName(e.target.value)}
-            placeholder="야찌 한 판"
+            placeholder="한 판 하실 분"
             maxLength={ROOM_NAME_MAX_LENGTH}
             className="rounded-lg bg-slate-800 px-4 py-2.5 text-base outline-none ring-1 ring-slate-700 focus:ring-indigo-500"
           />

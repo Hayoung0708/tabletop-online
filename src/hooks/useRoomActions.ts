@@ -3,45 +3,20 @@
 import { useRouter } from "next/navigation";
 import { getSocket } from "@/lib/socket";
 import { clearRoomJoined } from "@/utils/roomJoinStorage";
-import type { Category } from "@/utils/yatzy";
 
 export interface UseRoomActionsResult {
-  rollDice: () => void;
-  toggleHold: (dieIndex: number) => void;
-  scoreCategory: (category: Category) => void;
   startGame: () => void;
   sendEmote: () => void;
   leaveRoom: () => void;
 }
 
 /**
- * 방 안에서 서버로 보내는 소켓 액션들을 모아 둔다.
+ * 게임 종류와 상관없이 방 안에서 공통으로 쓰는 소켓 액션들을 모아 둔다.
  * @param code - 방 코드 (나가기 시 로컬 참가 기록을 지우는 데 사용)
- * @returns 방에서 쓸 수 있는 액션 함수 모음
+ * @returns 방에서 쓸 수 있는 공통 액션 함수 모음
  */
 export const useRoomActions = (code: string): UseRoomActionsResult => {
   const router = useRouter();
-
-  /** 주사위를 굴린다. */
-  const rollDice = (): void => {
-    getSocket().emit("roll_dice");
-  };
-
-  /**
-   * 주사위 하나의 홀드 여부를 뒤집는다.
-   * @param dieIndex
-   */
-  const toggleHold = (dieIndex: number): void => {
-    getSocket().emit("toggle_hold", { dieIndex });
-  };
-
-  /**
-   * 현재 주사위 값을 지정한 항목에 채운다.
-   * @param category
-   */
-  const scoreCategory = (category: Category): void => {
-    getSocket().emit("score_category", { category });
-  };
 
   /** 게임을 시작한다 (방장만 가능). */
   const startGame = (): void => {
@@ -64,5 +39,5 @@ export const useRoomActions = (code: string): UseRoomActionsResult => {
     router.push("/lobby");
   };
 
-  return { rollDice, toggleHold, scoreCategory, startGame, sendEmote, leaveRoom };
+  return { startGame, sendEmote, leaveRoom };
 };
