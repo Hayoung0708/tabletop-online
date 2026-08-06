@@ -1,0 +1,54 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+// A guest player, identified by an anonymous id stored in a cookie.
+// No login — just a nickname set when entering a room.
+model Player {
+  id        String   @id @default(cuid())
+  nickname  String?
+  createdAt DateTime @default(now())
+
+  roomPlayers RoomPlayer[]
+}
+
+// Durable record of a game room. Live in-round state (dice, turn, rolls
+// left) is kept in-memory on the socket server for speed and only the
+// final results are written back here when a game finishes.
+model Room {
+  id         String    @id @default(cuid())
+  code       String    @unique
+  name       String
+  gameType   String    @default("YATZY") // YATZY (more later)
+  isPrivate  Boolean   @default(false) // hidden from lobby, code-only entry
+  status     String    @default("WAITING") // WAITING | PLAYING | FINISHED
+  hostId     String
+  maxPlayers Int       @default(4)
+  createdAt  DateTime  @default(now())
+  finishedAt DateTime?
+
+  players RoomPlayer[]
+}
+
+model RoomPlayer {
+  id       String   @id @default(cuid())
+  roomId   String
+  playerId String
+  seat     Int
+  score    Int?
+  joinedAt DateTime @default(now())
+
+  room   Room   @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  player Player @relation(fields: [playerId], references: [id], onDelete: Cascade)
+
+  @@unique([roomId, playerId])
+  @@unique([roomId, seat])
+}

@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="45 38 110 110" width="200" height="200">
+<title>테이블탑 온라인 로고</title>
+<rect x="60.5" y="52.5" width="44" height="60" rx="6" fill="#FFFFFF" stroke="#4f39f6" stroke-width="2" transform="rotate(-6 82.5 82.5)"/>
+<path d="M0,-14 C6,-6 14,-2 14,6 C14,12 8,15 3,12 C3,18 5,22 8,24 L-8,24 C-5,22 -3,18 -3,12 C-8,15 -14,12 -14,6 C-14,-2 -6,-6 0,-14 Z" fill="#4f39f6" transform="translate(82.5,80.5) rotate(-6) scale(0.7)"/>
+<rect x="97.5" y="97.5" width="40" height="40" rx="10" fill="#4f39f6" transform="rotate(6 117.5 117.5)"/>
+<circle cx="109.5" cy="109.5" r="3" fill="#FFFFFF"/>
+<circle cx="117.5" cy="117.5" r="3" fill="#FFFFFF"/>
+<circle cx="125.5" cy="125.5" r="3" fill="#FFFFFF"/>
+</svg>
