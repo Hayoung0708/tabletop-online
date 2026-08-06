@@ -52,7 +52,7 @@ export const WaitingPanel = ({
           disabled={!canStart}
           className="mt-5 rounded-lg bg-indigo-600 px-7 py-3 font-medium transition hover:bg-indigo-500 disabled:opacity-50"
         >
-          게임 시작 {!canStart && "(최소 2명)"}
+          게임 시작
         </button>
       ) : (
         <p className="mt-5 text-sm text-slate-500">

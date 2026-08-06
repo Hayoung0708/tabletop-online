@@ -1,6 +1,6 @@
 "use client";
 
-import type { FormEvent, JSX, Ref } from "react";
+import type { FormEvent, JSX, MouseEvent, Ref } from "react";
 import { GAMES } from "@/constants/games";
 import type { UseCreateRoomFormResult } from "@/hooks/useCreateRoomForm";
 
@@ -34,10 +34,21 @@ export const CreateRoomDialog = ({
     void form.submit();
   };
 
+  /**
+   * 다이얼로그 바깥(배경) 클릭이면 닫는다. 안쪽 클릭은 그냥 통과시킨다.
+   * @param e - 클릭 이벤트
+   */
+  const handleBackdropClick = (e: MouseEvent<HTMLDialogElement>): void => {
+    if (e.target === e.currentTarget) onRequestClose();
+  };
+
+  const gameLabel = GAMES.find((g) => g.id === form.gameType)?.label ?? "";
+
   return (
     <dialog
       ref={dialogRef}
       onClose={form.clearError}
+      onClick={handleBackdropClick}
       className="m-auto w-[min(28rem,calc(100vw-2rem))] rounded-2xl border border-slate-700 bg-slate-900 p-6 text-slate-100 backdrop:bg-black/60"
     >
       <form method="dialog" onSubmit={handleSubmit} className="flex flex-col gap-5">
@@ -75,7 +86,7 @@ export const CreateRoomDialog = ({
           <input
             value={form.roomName}
             onChange={(e) => form.setRoomName(e.target.value)}
-            placeholder="한 판 하실 분"
+            placeholder={`${gameLabel} 한 판`}
             maxLength={ROOM_NAME_MAX_LENGTH}
             className="rounded-lg bg-slate-800 px-4 py-2.5 text-base outline-none ring-1 ring-slate-700 focus:ring-indigo-500"
           />

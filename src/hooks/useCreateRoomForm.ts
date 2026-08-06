@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createRoom } from "@/utils/roomApi";
+import { GAMES } from "@/constants/games";
 
 const DEFAULT_MAX_PLAYERS = 6;
 
@@ -37,9 +38,10 @@ export const useCreateRoomForm = (): UseCreateRoomFormResult => {
     setCreating(true);
     setError(null);
     try {
+      const gameLabel = GAMES.find((g) => g.id === gameType)?.label ?? "";
       const result = await createRoom({
         gameType,
-        name: roomName.trim(),
+        name: roomName.trim() || `${gameLabel} 한 판`,
         isPrivate,
         maxPlayers: DEFAULT_MAX_PLAYERS,
       });
