@@ -41,9 +41,7 @@ export const FaceUpSelection = ({
   };
 
   return (
-    <div className="flex flex-col items-center gap-3 rounded-xl border border-slate-800 bg-slate-900/40 px-4 py-3">
-      <p className="text-sm text-slate-400">바닥패로 놓을 카드 3장을 선택하세요.</p>
-
+    <div className="flex flex-col items-start gap-3 rounded-xl border border-slate-800 bg-slate-900/40 px-3 pt-3 pb-4">
       <div className="flex items-end gap-6">
         <FaceCardSlots faceUp={[]} faceDownCount={FACE_DOWN_SIZE} />
         <div className="flex flex-wrap gap-2">
@@ -58,13 +56,15 @@ export const FaceUpSelection = ({
         </div>
       </div>
 
-      <button
-        onClick={() => onConfirm(selectedIds)}
-        disabled={selectedIds.length !== FACE_UP_PICK_SIZE}
-        className="rounded-lg bg-indigo-600 px-6 py-2.5 text-base font-medium transition hover:bg-indigo-500 disabled:opacity-40"
-      >
-        바닥패로 놓기 ({selectedIds.length}/{FACE_UP_PICK_SIZE})
-      </button>
+      <div className="flex w-full justify-center">
+        <button
+          onClick={() => onConfirm(selectedIds)}
+          disabled={selectedIds.length !== FACE_UP_PICK_SIZE}
+          className="rounded-lg bg-indigo-600 px-6 py-2.5 text-base font-medium transition hover:bg-indigo-500 disabled:opacity-40"
+        >
+          바닥패로 놓기 ({selectedIds.length}/{FACE_UP_PICK_SIZE})
+        </button>
+      </div>
     </div>
   );
 };

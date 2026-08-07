@@ -79,12 +79,6 @@ export const ShitheadGameBoard = ({
                 onPlayFaceDown={playFaceDownCard}
                 onPickUpPile={pickUpPile}
               />
-
-              {allSelected && !isMyTurn && (
-                <p className="text-center text-sm text-slate-500">
-                  {nicknameOf(game.currentPlayerId ?? "")}님의 차례입니다...
-                </p>
-              )}
             </>
           )}
         </>

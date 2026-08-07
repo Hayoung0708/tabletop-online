@@ -80,13 +80,13 @@ export const MyZones = ({
     activeZone.every((c) => !isLegal(c));
 
   return (
-    <div className="flex flex-col items-center gap-3 rounded-xl border border-slate-800 bg-slate-900/40 px-4 py-3">
+    <div className="flex flex-col items-start gap-3 rounded-xl border border-slate-800 bg-slate-900/40 px-3 pt-3 pb-4">
       <div className="flex items-end gap-6">
         <FaceCardSlots
           faceUp={faceUp}
           faceDownCount={faceDownCount}
           selectedIds={hand.length === 0 ? selectedIds : undefined}
-          isFaceUpLegal={hand.length === 0 ? isLegal : undefined}
+          isFaceUpLegal={hand.length === 0 ? isLegal : (): boolean => false}
           onToggleFaceUp={hand.length === 0 && isMyTurn ? toggleCard : undefined}
           onFlipFaceDown={isBlindPhase && isMyTurn ? onPlayFaceDown : undefined}
         />
@@ -104,7 +104,7 @@ export const MyZones = ({
       </div>
 
       {!isBlindPhase && (
-        <div className="flex gap-2">
+        <div className="flex w-full justify-center gap-2">
           <button
             onClick={handlePlay}
             disabled={!isMyTurn || selectedIds.length === 0}

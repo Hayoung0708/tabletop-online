@@ -9,8 +9,12 @@ export interface PileAndDeckProps {
   deckCount: number;
 }
 
+const EMPTY_SLOT_CLASS =
+  "flex h-24 w-16 items-center justify-center rounded-lg border-2 border-dashed border-slate-700 sm:h-28 sm:w-20";
+
 /**
- * 가운데에 놓인 뽑을 덱과 버려진 더미(맨 위 카드만 보임).
+ * 가운데에 놓인 뽑을 덱과 버려진 더미(맨 위 카드만 보임). 각각 몇 장
+ * 남았는지 카드 밑에 표시한다.
  * @param props - 더미/덱 상태
  * @param props.pile
  * @param props.deckCount
@@ -20,26 +24,22 @@ export const PileAndDeck = ({ pile, deckCount }: PileAndDeckProps): JSX.Element 
   const topCard = pile[pile.length - 1];
 
   return (
-    <div className="flex items-center justify-center gap-8 py-4">
+    <div className="flex items-start justify-center gap-6 py-4">
       <div className="flex flex-col items-center gap-1.5">
         {deckCount > 0 ? (
-          <PlayingCard faceDown />
+          <PlayingCard faceDown size="large" />
         ) : (
-          <div className="flex h-20 w-14 items-center justify-center rounded-lg border-2 border-dashed border-slate-700 text-xs text-slate-600 sm:h-24 sm:w-16">
-            빈 덱
-          </div>
+          <div className={EMPTY_SLOT_CLASS} />
         )}
-        <span className="text-xs text-slate-500">덱 {deckCount}장</span>
+        <span className="text-sm text-slate-400">덱 {deckCount}장</span>
       </div>
       <div className="flex flex-col items-center gap-1.5">
         {topCard ? (
-          <PlayingCard card={topCard} />
+          <PlayingCard card={topCard} size="large" />
         ) : (
-          <div className="flex h-20 w-14 items-center justify-center rounded-lg border-2 border-dashed border-slate-700 text-xs text-slate-600 sm:h-24 sm:w-16">
-            빈 더미
-          </div>
+          <div className={EMPTY_SLOT_CLASS} />
         )}
-        <span className="text-xs text-slate-500">더미 {pile.length}장</span>
+        <span className="text-sm text-slate-400">더미 {pile.length}장</span>
       </div>
     </div>
   );

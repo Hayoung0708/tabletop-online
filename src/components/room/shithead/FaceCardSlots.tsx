@@ -39,7 +39,10 @@ export const FaceCardSlots = ({
       {Array.from({ length: faceDownCount }, (_, i) => {
         const topCard = i < faceUp.length ? faceUp[i] : undefined;
         return (
-          <div key={i} className="relative h-28 w-14 shrink-0 sm:h-32 sm:w-16">
+          <div
+            key={i}
+            className="relative h-[5.625rem] w-14 shrink-0 sm:h-[6.625rem] sm:w-16"
+          >
             <div className="absolute top-2.5 left-0 z-0">
               <PlayingCard
                 faceDown
