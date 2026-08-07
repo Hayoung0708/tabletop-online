@@ -2,15 +2,15 @@
 
 import { useEffect, useRef, useState } from "react";
 import { getSocket } from "@/lib/socket";
-import { EMOTE_AUDIO_SRC } from "@/constants/media";
-import { playSound } from "@/utils/sound";
+import { EMOTES } from "@/constants/media";
+import { playRandomSound } from "@/utils/sound";
 import { useToast, type ToastMsg } from "@/hooks/useToast";
 import type { PublicRoomState } from "@/server/roomManager";
 
 export interface ActiveEmote {
   id: number;
-  x: number;
-  y: number;
+  userId: string;
+  emoteId: string;
 }
 
 export interface UseRoomSocketResult {
@@ -91,15 +91,26 @@ export const useRoomSocket = (
     };
 
     /**
-     * 다른 플레이어가 보낸 감정표현을 화면에 추가한다.
+     * 다른 플레이어가 보낸 감정표현을 화면에 반영한다. 플레이어당 슬롯이
+     * 하나뿐이라, 이전에 재생 중이던 감정표현이 있으면 끊고 새로 튼다.
      * @param root0
-     * @param root0.x
-     * @param root0.y
+     * @param root0.userId
+     * @param root0.emoteId
      */
-    const onEmote = ({ x, y }: { x: number; y: number }): void => {
+    const onEmote = ({
+      userId: fromUserId,
+      emoteId,
+    }: {
+      userId: string;
+      emoteId: string;
+    }): void => {
       emoteIdSeq += 1;
-      setActiveEmotes((prev) => [...prev, { id: emoteIdSeq, x, y }]);
-      playSound(EMOTE_AUDIO_SRC);
+      setActiveEmotes((prev) => [
+        ...prev.filter((e) => e.userId !== fromUserId),
+        { id: emoteIdSeq, userId: fromUserId, emoteId },
+      ]);
+      const audio = EMOTES.find((e) => e.id === emoteId)?.audio;
+      if (audio) playRandomSound(audio);
     };
 
     socket.on("connect", join);

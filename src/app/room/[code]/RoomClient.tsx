@@ -8,18 +8,16 @@ import { AdRail } from "@/components/room/AdRail";
 import { RoomHeader } from "@/components/room/RoomHeader";
 import { NicknameForm } from "@/components/room/NicknameForm";
 import { PlayerSidebar } from "@/components/room/PlayerSidebar";
-import { DiceTray } from "@/components/room/DiceTray";
-import { Scoreboard } from "@/components/room/Scoreboard";
 import { WaitingPanel } from "@/components/room/WaitingPanel";
-import { FinishedPanel } from "@/components/room/FinishedPanel";
-import { EmoteOverlay } from "@/components/room/EmoteOverlay";
+import { Rulebook } from "@/components/room/Rulebook";
 import { LeaveConfirmDialog } from "@/components/room/LeaveConfirmDialog";
+import { YatzyGameBoard } from "@/components/room/yatzy/YatzyGameBoard";
+import { ShitheadGameBoard } from "@/components/room/shithead/ShitheadGameBoard";
 import { useNicknameJoin } from "@/hooks/useNicknameJoin";
 import { useRoomSocket } from "@/hooks/useRoomSocket";
 import { useRoomActions } from "@/hooks/useRoomActions";
-import { useDiceRollAnimation } from "@/hooks/useDiceRollAnimation";
-import { useYahtzeeCelebrations } from "@/hooks/useYahtzeeCelebrations";
 import { useCopyRoomCode } from "@/hooks/useCopyRoomCode";
+import type { PublicRoomState } from "@/server/roomManager";
 
 export interface RoomClientProps {
   code: string;
@@ -28,8 +26,33 @@ export interface RoomClientProps {
 }
 
 /**
- * 방 화면 전체를 조립한다. 상태/소켓/애니메이션은 각 훅에 맡기고, 여기서는
- * 참가 단계(닉네임 폼 → 로딩 → 실제 게임 화면)에 따라 화면만 배치한다.
+ * 참가자 목록 옆에 보여줄 한 줄짜리 추가 정보를 게임 종류에 맞게 만든다
+ * (야찌는 총점, 싯헤드는 남은 카드 수). 대기 중에는 아무것도 안 보여준다.
+ * @param state - 현재 방 상태
+ * @returns 유저id를 받아 추가 정보 문자열을 돌려주는 함수, 보여줄 게 없으면 undefined
+ */
+const buildSidebarExtraLine = (
+  state: PublicRoomState | null,
+): ((userId: string) => string | null) | undefined => {
+  if (!state || state.status === "WAITING") return undefined;
+
+  if (state.game.type === "YATZY") {
+    const { totals } = state.game;
+    return (userId) => `${totals[userId]}점`;
+  }
+
+  const { players } = state.game;
+  return (userId) => {
+    const p = players.find((pl) => pl.userId === userId);
+    if (!p) return null;
+    return `카드 ${p.handCount + p.faceUp.length + p.faceDownCount}장`;
+  };
+};
+
+/**
+ * 방 화면 전체를 조립한다. 상태/소켓은 훅에 맡기고, 여기서는 참가
+ * 단계(닉네임 폼 → 로딩 → 대기 화면 → 게임판)에 따라 화면만 배치한다.
+ * 실제 게임판은 게임 종류에 맞는 GameBoard 컴포넌트에 위임한다.
  * @param props - 방 코드, 방 이름, 내 게스트 식별자
  * @param props.code
  * @param props.roomName
@@ -46,13 +69,8 @@ export const RoomClient = ({ code, roomName, userId }: RoomClientProps): JSX.Ele
     joined,
     userId,
   );
-  const { rollDice, toggleHold, scoreCategory, startGame, sendEmote, leaveRoom } =
+  const { startGame, updateRoom, sendEmote, emoteOnCooldown, leaveRoom } =
     useRoomActions(code);
-  const { celebrations, addCelebration, removeCelebration } = useYahtzeeCelebrations();
-  const { rollingMask, randomFaces, isRolling } = useDiceRollAnimation(
-    state,
-    addCelebration,
-  );
   const { copied, copyCode } = useCopyRoomCode(code);
 
   // 소켓은 페이지 이동에도 살아남는 싱글턴이라, 이 방을 벗어날 때(버튼,
@@ -65,10 +83,7 @@ export const RoomClient = ({ code, roomName, userId }: RoomClientProps): JSX.Ele
 
   const me = state?.players.find((p) => p.userId === userId) ?? null;
   const isHost = state?.hostId === userId;
-  const isMyTurn = state?.currentPlayerId === userId;
-  const hasRolled = (state?.rollsLeft ?? 3) < 3;
   const activePlayers = state?.players.filter((p) => p.connected) ?? [];
-  const showBoard = state?.status === "PLAYING" || state?.status === "FINISHED";
 
   /** 진행 중인 게임이면 확인 다이얼로그를 띄우고, 아니면 바로 나간다. */
   const handleExit = (): void => {
@@ -84,26 +99,28 @@ export const RoomClient = ({ code, roomName, userId }: RoomClientProps): JSX.Ele
       <SiteHeader onExit={handleExit} />
       <AdRail side="left" />
       <AdRail side="right" />
-      <EmoteOverlay
-        activeEmotes={activeEmotes}
-        onRemoveEmote={removeEmote}
-        celebrations={celebrations}
-        onRemoveCelebration={removeCelebration}
-      />
 
       <div className="flex min-h-0 flex-1 justify-center overflow-hidden">
         {joined && state && (
           <PlayerSidebar
             players={state.players}
-            currentPlayerId={state.currentPlayerId}
+            currentPlayerId={state.game.currentPlayerId}
             hostId={state.hostId}
-            showTotals={state.status !== "WAITING"}
+            extraLine={buildSidebarExtraLine(state)}
             onSendEmote={sendEmote}
+            emoteOnCooldown={emoteOnCooldown}
+            activeEmotes={activeEmotes}
+            onRemoveEmote={removeEmote}
           />
         )}
 
-        <main className="flex w-full max-w-3xl min-h-0 flex-1 flex-col gap-3 overflow-y-auto px-4 py-3 sm:px-6">
-          <RoomHeader roomName={roomName} code={code} onCopyCode={copyCode} />
+        <main className="flex w-full max-w-4xl min-h-0 flex-1 flex-col gap-3 overflow-y-auto px-4 py-3 sm:px-6">
+          <RoomHeader
+            roomName={state?.name ?? roomName}
+            code={code}
+            gameType={state?.game.type ?? null}
+            onCopyCode={copyCode}
+          />
 
           {!joined ? (
             <NicknameForm
@@ -129,40 +146,24 @@ export const RoomClient = ({ code, roomName, userId }: RoomClientProps): JSX.Ele
                   activePlayerCount={activePlayers.length}
                   maxPlayers={state.maxPlayers}
                   isHost={isHost}
-                  winnerUserId={state.winnerUserId}
+                  roomName={state.name}
+                  gameType={state.game.type}
+                  winnerUserId={state.game.winnerUserId}
                   onStartGame={startGame}
+                  onUpdateRoom={updateRoom}
                 />
               )}
 
-              {state.status === "PLAYING" && (
-                <DiceTray
-                  dice={state.dice}
-                  held={state.held}
-                  rollingMask={rollingMask}
-                  randomFaces={randomFaces}
-                  rollsLeft={state.rollsLeft}
-                  isMyTurn={isMyTurn}
-                  hasRolled={hasRolled}
-                  isRolling={isRolling}
-                  onToggleHold={toggleHold}
-                  onRoll={rollDice}
-                />
-              )}
-
-              {state.status === "FINISHED" && (
-                <FinishedPanel players={state.players} onLeaveRoom={leaveRoom} />
-              )}
-
-              {showBoard && (
-                <Scoreboard
-                  players={activePlayers}
-                  dice={state.dice}
-                  userId={userId}
-                  isMyTurn={isMyTurn}
-                  hasRolled={hasRolled && !isRolling}
-                  onScore={scoreCategory}
-                />
-              )}
+              {(state.status === "PLAYING" || state.status === "FINISHED") &&
+                (state.game.type === "YATZY" ? (
+                  <YatzyGameBoard state={state} userId={userId} onLeaveRoom={leaveRoom} />
+                ) : (
+                  <ShitheadGameBoard
+                    state={state}
+                    userId={userId}
+                    onLeaveRoom={leaveRoom}
+                  />
+                ))}
 
               {me === null && (
                 <p className="text-sm text-slate-500">
@@ -173,9 +174,7 @@ export const RoomClient = ({ code, roomName, userId }: RoomClientProps): JSX.Ele
           )}
         </main>
 
-        {joined && state && (
-          <aside className="hidden w-52 shrink-0 border-l border-slate-800 px-4 py-4 sm:block" />
-        )}
+        {joined && state && <Rulebook gameType={state.game.type} />}
       </div>
 
       {copied && (

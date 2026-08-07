@@ -1,6 +1,7 @@
 "use client";
 
-import type { FormEvent, JSX, Ref } from "react";
+import type { FormEvent, JSX, MouseEvent, Ref } from "react";
+import { Check } from "lucide-react";
 import { GAMES } from "@/constants/games";
 import type { UseCreateRoomFormResult } from "@/hooks/useCreateRoomForm";
 
@@ -34,10 +35,21 @@ export const CreateRoomDialog = ({
     void form.submit();
   };
 
+  /**
+   * 다이얼로그 바깥(배경) 클릭이면 닫는다. 안쪽 클릭은 그냥 통과시킨다.
+   * @param e - 클릭 이벤트
+   */
+  const handleBackdropClick = (e: MouseEvent<HTMLDialogElement>): void => {
+    if (e.target === e.currentTarget) onRequestClose();
+  };
+
+  const gameLabel = GAMES.find((g) => g.id === form.gameType)?.label ?? "";
+
   return (
     <dialog
       ref={dialogRef}
       onClose={form.clearError}
+      onClick={handleBackdropClick}
       className="m-auto w-[min(28rem,calc(100vw-2rem))] rounded-2xl border border-slate-700 bg-slate-900 p-6 text-slate-100 backdrop:bg-black/60"
     >
       <form method="dialog" onSubmit={handleSubmit} className="flex flex-col gap-5">
@@ -50,23 +62,27 @@ export const CreateRoomDialog = ({
               <button
                 key={g.id}
                 type="button"
+                disabled={g.disabled}
                 onClick={() => form.setGameType(g.id)}
                 aria-pressed={form.gameType === g.id}
-                className={`flex flex-col items-center gap-1 rounded-xl border-2 px-4 py-5 transition ${
-                  form.gameType === g.id
-                    ? "border-indigo-500 bg-indigo-950"
-                    : "border-slate-700 bg-slate-800 hover:border-slate-600"
+                className={`flex flex-col items-center gap-0.5 rounded-xl border-2 px-4 py-5 transition ${
+                  g.disabled
+                    ? "cursor-default border-slate-800 bg-slate-800/40 text-slate-500"
+                    : form.gameType === g.id
+                      ? "border-indigo-500 bg-indigo-950"
+                      : "border-slate-700 bg-slate-800 hover:border-slate-600"
                 }`}
               >
-                <span className="text-3xl">{g.icon}</span>
-                <span className="text-lg font-semibold">{g.label}</span>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={g.icon}
+                  alt=""
+                  className={`h-24 w-24 ${g.disabled ? "opacity-40" : ""}`}
+                />
+                <span className="-mt-3 text-lg font-semibold">{g.label}</span>
                 <span className="text-center text-sm text-slate-400">{g.desc}</span>
               </button>
             ))}
-            <div className="flex flex-col items-center justify-center gap-1 rounded-xl border-2 border-dashed border-slate-800 px-4 py-5 text-slate-600">
-              <span className="text-3xl">➕</span>
-              <span className="text-sm">추가 예정</span>
-            </div>
           </div>
         </div>
 
@@ -75,7 +91,7 @@ export const CreateRoomDialog = ({
           <input
             value={form.roomName}
             onChange={(e) => form.setRoomName(e.target.value)}
-            placeholder="야찌 한 판"
+            placeholder={`${gameLabel} 한 판`}
             maxLength={ROOM_NAME_MAX_LENGTH}
             className="rounded-lg bg-slate-800 px-4 py-2.5 text-base outline-none ring-1 ring-slate-700 focus:ring-indigo-500"
           />
@@ -86,8 +102,17 @@ export const CreateRoomDialog = ({
             type="checkbox"
             checked={form.isPrivate}
             onChange={(e) => form.setIsPrivate(e.target.checked)}
-            className="mt-0.5 h-4 w-4 accent-indigo-500"
+            className="peer sr-only"
           />
+          <span
+            className={`mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-lg border-2 transition ${
+              form.isPrivate
+                ? "border-indigo-500 bg-indigo-500 text-white"
+                : "border-slate-600 bg-slate-800 text-transparent"
+            }`}
+          >
+            <Check className="h-4 w-4" strokeWidth={4} />
+          </span>
           <span className="flex flex-col gap-0.5">
             <span className="text-base font-medium">비밀방</span>
             <span className="text-sm text-slate-400">

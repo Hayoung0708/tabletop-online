@@ -8,7 +8,13 @@ import {
   SCORE_CELL_BASE_CLASS,
   UPPER_CATEGORIES,
 } from "@/constants/scoreboard";
-import { calculateScore, upperBonus, upperTotal, type Category } from "@/utils/yatzy";
+import {
+  calculateScore,
+  upperBonus,
+  upperTotal,
+  type Category,
+  type Scorecard,
+} from "@/utils/yatzy";
 import type { PublicRoomState } from "@/server/roomManager";
 
 const BONUS_TOOLTIP_TEXT =
@@ -18,6 +24,8 @@ type PlayerRow = PublicRoomState["players"][number];
 
 export interface ScoreboardProps {
   players: PlayerRow[];
+  scorecards: Record<string, Scorecard>;
+  totals: Record<string, number>;
   dice: number[];
   userId: string;
   isMyTurn: boolean;
@@ -29,6 +37,8 @@ export interface ScoreboardProps {
  * 야찌 점수표 전체 (상단/보너스/하단/합계).
  * @param props - 참가자 점수 데이터와 항목 클릭 핸들러
  * @param props.players
+ * @param props.scorecards
+ * @param props.totals
  * @param props.dice
  * @param props.userId
  * @param props.isMyTurn
@@ -38,6 +48,8 @@ export interface ScoreboardProps {
  */
 export const Scoreboard = ({
   players,
+  scorecards,
+  totals,
   dice,
   userId,
   isMyTurn,
@@ -69,6 +81,7 @@ export const Scoreboard = ({
               cat={cat}
               idx={idx}
               players={players}
+              scorecards={scorecards}
               dice={dice}
               userId={userId}
               isMyTurn={isMyTurn}
@@ -76,13 +89,14 @@ export const Scoreboard = ({
               onScore={onScore}
             />
           ))}
-          <BonusRow players={players} />
+          <BonusRow players={players} scorecards={scorecards} />
           {LOWER_CATEGORIES.map((cat, idx) => (
             <ScoreRow
               key={cat}
               cat={cat}
               idx={idx}
               players={players}
+              scorecards={scorecards}
               dice={dice}
               userId={userId}
               isMyTurn={isMyTurn}
@@ -90,7 +104,7 @@ export const Scoreboard = ({
               onScore={onScore}
             />
           ))}
-          <TotalRow players={players} />
+          <TotalRow players={players} totals={totals} />
         </tbody>
       </table>
     </div>
@@ -101,6 +115,7 @@ interface ScoreRowProps {
   cat: Category;
   idx: number;
   players: PlayerRow[];
+  scorecards: Record<string, Scorecard>;
   dice: number[];
   userId: string;
   isMyTurn: boolean;
@@ -114,6 +129,7 @@ interface ScoreRowProps {
  * @param props.cat
  * @param props.idx
  * @param props.players
+ * @param props.scorecards
  * @param props.dice
  * @param props.userId
  * @param props.isMyTurn
@@ -125,6 +141,7 @@ const ScoreRow = ({
   cat,
   idx,
   players,
+  scorecards,
   dice,
   userId,
   isMyTurn,
@@ -135,7 +152,7 @@ const ScoreRow = ({
     <tr className={idx % 2 === 0 ? "bg-transparent" : "bg-slate-950/30"}>
       <td className="py-1 pr-2 pl-4 text-slate-300">{CATEGORY_LABELS[cat]}</td>
       {players.map((p) => {
-        const filled = p.scorecard[cat];
+        const filled = scorecards[p.userId][cat];
         const isOwnTurn = p.userId === userId && isMyTurn && hasRolled;
         // 이미 채운 야찌 칸이라도 다시 5개가 같은 눈이면 위에 쌓을 수 있다.
         const stackable =
@@ -178,11 +195,18 @@ const ScoreRow = ({
 
 /**
  * 상단 보너스 조건 달성 여부를 보여주는 줄.
- * @param props - 참가자 목록
+ * @param props - 참가자 목록과 점수판
  * @param props.players
+ * @param props.scorecards
  * @returns 테이블 행 엘리먼트
  */
-const BonusRow = ({ players }: { players: PlayerRow[] }): JSX.Element => {
+const BonusRow = ({
+  players,
+  scorecards,
+}: {
+  players: PlayerRow[];
+  scorecards: Record<string, Scorecard>;
+}): JSX.Element => {
   return (
     <tr className="bg-slate-950/60 text-base">
       <td className="py-1.5 pr-2 pl-4 text-slate-400">
@@ -192,13 +216,14 @@ const BonusRow = ({ players }: { players: PlayerRow[] }): JSX.Element => {
         </span>
       </td>
       {players.map((p) => {
-        const bonus = upperBonus(p.scorecard);
+        const scorecard = scorecards[p.userId];
+        const bonus = upperBonus(scorecard);
         return (
           <td key={p.userId} className="px-2 py-1.5 text-center text-slate-400">
             {bonus > 0 ? (
               <span className="text-emerald-400">{bonus}</span>
             ) : (
-              `${upperTotal(p.scorecard)}/63`
+              `${upperTotal(scorecard)}/63`
             )}
           </td>
         );
@@ -209,11 +234,18 @@ const BonusRow = ({ players }: { players: PlayerRow[] }): JSX.Element => {
 
 /**
  * 최종 합계 줄.
- * @param props - 참가자 목록
+ * @param props - 참가자 목록과 총점
  * @param props.players
+ * @param props.totals
  * @returns 테이블 행 엘리먼트
  */
-const TotalRow = ({ players }: { players: PlayerRow[] }): JSX.Element => {
+const TotalRow = ({
+  players,
+  totals,
+}: {
+  players: PlayerRow[];
+  totals: Record<string, number>;
+}): JSX.Element => {
   return (
     <tr className="border-t border-slate-800 bg-slate-900">
       <td className="rounded-bl-xl py-2 pr-2 pl-4 text-base font-bold text-slate-100">
@@ -224,7 +256,7 @@ const TotalRow = ({ players }: { players: PlayerRow[] }): JSX.Element => {
           key={p.userId}
           className="px-2 py-2 text-center text-base font-bold text-indigo-300 last:rounded-br-xl"
         >
-          {p.total}
+          {totals[p.userId]}
         </td>
       ))}
     </tr>

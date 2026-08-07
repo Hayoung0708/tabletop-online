@@ -1,25 +1,20 @@
-import {
-  CATEGORIES,
-  type Category,
-  type Scorecard,
-  calculateScore,
-  emptyScorecard,
-  rollDice,
-  totalScore,
-} from "@/utils/yatzy";
+import { ROOM_NAME_MAX_LENGTH } from "@/constants/app";
+import type { PublicYatzyGameState, YatzyGameData } from "@/server/yatzy/gameLogic";
+import type {
+  PublicShitheadGameState,
+  ShitheadGameData,
+} from "@/server/shithead/gameLogic";
 
-const TOTAL_TURNS = CATEGORIES.length;
-const INITIAL_DICE = [1, 1, 1, 1, 1];
-const INITIAL_HELD = [false, false, false, false, false];
 const MIN_PLAYERS_TO_START = 2;
+
+export type GameData = YatzyGameData | ShitheadGameData;
+export type PublicGameState = PublicYatzyGameState | PublicShitheadGameState;
 
 export interface PlayerState {
   userId: string;
   nickname: string;
   seat: number;
-  scorecard: Scorecard;
   connected: boolean;
-  turnsTaken: number;
 }
 
 export type RoomStatus = "WAITING" | "PLAYING" | "FINISHED";
@@ -27,15 +22,12 @@ export type RoomStatus = "WAITING" | "PLAYING" | "FINISHED";
 export interface RoomState {
   dbId: string;
   code: string;
+  name: string;
   hostId: string;
   maxPlayers: number;
   status: RoomStatus;
   players: PlayerState[];
-  dice: number[];
-  held: boolean[];
-  rollsLeft: number;
-  currentPlayerIndex: number;
-  winnerUserId: string | null;
+  game: GameData;
 }
 
 const rooms = new Map<string, RoomState>();
@@ -50,18 +42,24 @@ export const getRoom = (code: string): RoomState | undefined => {
 };
 
 /**
- * 인메모리 방 상태를 가져오거나, 없으면 새로 만든다.
+ * 인메모리 방 상태를 가져오거나, 없으면 새로 만든다. 게임별 초기 상태는
+ * 호출하는 쪽(게임 디스패치)에서 만들어 넘겨준다 — roomManager는 어떤
+ * 게임인지 몰라도 되게 하기 위함.
  * @param dbId - DB상의 방 id
  * @param code - 방 코드
+ * @param name - 방 제목
  * @param hostId - 방장 게스트 id
  * @param maxPlayers - 최대 인원
+ * @param idleGame - 이 방의 게임 종류에 맞는 초기 게임 상태
  * @returns 방 상태
  */
 export const createOrGetRoom = (
   dbId: string,
   code: string,
+  name: string,
   hostId: string,
   maxPlayers: number,
+  idleGame: GameData,
 ): RoomState => {
   const existing = rooms.get(code);
   if (existing) return existing;
@@ -69,15 +67,12 @@ export const createOrGetRoom = (
   const room: RoomState = {
     dbId,
     code,
+    name,
     hostId,
     maxPlayers,
     status: "WAITING",
     players: [],
-    dice: [...INITIAL_DICE],
-    held: [...INITIAL_HELD],
-    rollsLeft: 3,
-    currentPlayerIndex: 0,
-    winnerUserId: null,
+    game: idleGame,
   };
   rooms.set(code, room);
   return room;
@@ -106,14 +101,7 @@ export const addPlayer = (
   // 상태에서 나가면 좌석과 충돌한다. 항상 가장 큰 좌석번호+1을 써야 한다.
   const nextSeat = room.players.reduce((max, p) => Math.max(max, p.seat), -1) + 1;
 
-  const player: PlayerState = {
-    userId,
-    nickname,
-    seat: nextSeat,
-    scorecard: emptyScorecard(),
-    connected: true,
-    turnsTaken: 0,
-  };
+  const player: PlayerState = { userId, nickname, seat: nextSeat, connected: true };
   room.players.push(player);
   return player;
 };
@@ -150,11 +138,6 @@ export const deleteRoom = (code: string): void => {
   rooms.delete(code);
 };
 
-export interface LastPlayerStandingResult {
-  winnerUserId: string;
-  removedPlayerIds: string[];
-}
-
 /**
  * 현재 방장이 연결 끊김 상태면, 연결된 다음 플레이어(좌석 순)에게 방장을
  * 넘긴다.
@@ -172,37 +155,6 @@ export const reassignHostIfNeeded = (room: RoomState): string | null => {
 
   room.hostId = nextHost.userId;
   return nextHost.userId;
-};
-
-/**
- * 게임 진행 중 한 명만 남고 모두 연결이 끊겼으면 그 한 명을 승자로 처리하고
- * 방을 새 대기방 상태로 되돌린다 (일반 종료 화면 대신).
- * @param room - 대상 방
- * @returns 승자와 제거된 플레이어 목록, 해당 없으면 null
- */
-export const checkLastPlayerStanding = (
-  room: RoomState,
-): LastPlayerStandingResult | null => {
-  if (room.status !== "PLAYING") return null;
-
-  const connected = room.players.filter((p) => p.connected);
-  if (connected.length !== 1) return null;
-
-  const [winner] = connected;
-  const removedPlayerIds = room.players
-    .filter((p) => p.userId !== winner.userId)
-    .map((p) => p.userId);
-
-  room.players = [{ ...winner, seat: 0, scorecard: emptyScorecard(), turnsTaken: 0 }];
-  room.status = "WAITING";
-  room.winnerUserId = winner.userId;
-  room.hostId = winner.userId;
-  room.dice = [...INITIAL_DICE];
-  room.held = [...INITIAL_HELD];
-  room.rollsLeft = 3;
-  room.currentPlayerIndex = 0;
-
-  return { winnerUserId: winner.userId, removedPlayerIds };
 };
 
 /**
@@ -225,20 +177,13 @@ export const removeDisconnectedPlayers = (room: RoomState): string[] => {
 };
 
 /**
- * 현재 차례인 플레이어를 반환한다.
- * @param room - 대상 방
- * @returns 현재 차례 플레이어
- */
-const currentPlayer = (room: RoomState): PlayerState => {
-  return room.players[room.currentPlayerIndex];
-};
-
-/**
- * 게임을 시작한다. 방장만 시작할 수 있고, 최소 인원을 채워야 한다.
+ * 게임 시작 공통 조건(방장인지, 대기 중인지, 최소 인원)을 확인하고 방
+ * 상태를 PLAYING으로 바꾼다. 게임별 카드/주사위 초기화는 각 게임의
+ * startXGame이 뒤이어 처리한다.
  * @param room - 대상 방
  * @param requesterId - 시작을 요청한 게스트 id
  */
-export const startGame = (room: RoomState, requesterId: string): void => {
+export const assertCanStartGame = (room: RoomState, requesterId: string): void => {
   if (room.hostId !== requesterId) throw new Error("호스트만 시작할 수 있습니다.");
   if (room.status !== "WAITING") throw new Error("이미 시작된 게임입니다.");
   // 연결이 끊긴 채로 남아있는 사람이 인원수를 부풀려 시작 가능한 것처럼
@@ -248,157 +193,64 @@ export const startGame = (room: RoomState, requesterId: string): void => {
     throw new Error("최소 2명이 필요합니다.");
 
   room.status = "PLAYING";
-  room.currentPlayerIndex = 0;
-  room.dice = [...INITIAL_DICE];
-  room.held = [...INITIAL_HELD];
-  room.rollsLeft = 3;
-  room.winnerUserId = null;
-  for (const p of room.players) {
-    p.scorecard = emptyScorecard();
-    p.turnsTaken = 0;
-  }
 };
 
 /**
- * 주사위를 굴린다. 홀드된 주사위는 그대로 두고 나머지만 다시 굴린다.
+ * 대기 중에 방장이 방 제목과 게임 종류를 바꾼다. 게임별 초기 상태는 호출하는
+ * 쪽(게임 디스패치)에서 만들어 넘겨준다 — roomManager는 게임을 몰라도 되게 한다.
  * @param room - 대상 방
- * @param requesterId - 요청한 게스트 id
+ * @param requesterId - 변경을 요청한 게스트 id
+ * @param name - 새 방 제목
+ * @param idleGame - 새 게임 종류의 초기 상태
  */
-export const rollDiceForRoom = (room: RoomState, requesterId: string): void => {
-  assertTurn(room, requesterId);
-  if (room.rollsLeft <= 0) throw new Error("더 이상 굴릴 수 없습니다.");
-
-  const fresh = rollDice(5);
-  room.dice = room.dice.map((v, i) => (room.held[i] ? v : fresh[i]));
-  room.rollsLeft -= 1;
-};
-
-/**
- * 주사위 하나의 홀드 여부를 뒤집는다.
- * @param room - 대상 방
- * @param requesterId - 요청한 게스트 id
- * @param dieIndex - 대상 주사위 인덱스 (0~4)
- */
-export const toggleHold = (
+export const updateRoomSettings = (
   room: RoomState,
   requesterId: string,
-  dieIndex: number,
+  name: string,
+  idleGame: GameData,
 ): void => {
-  assertTurn(room, requesterId);
-  if (room.rollsLeft === 3) throw new Error("먼저 주사위를 굴려주세요.");
-  if (dieIndex < 0 || dieIndex > 4) throw new Error("잘못된 주사위입니다.");
+  if (room.hostId !== requesterId) throw new Error("호스트만 변경할 수 있습니다.");
+  if (room.status !== "WAITING") throw new Error("게임 중에는 변경할 수 없습니다.");
 
-  room.held[dieIndex] = !room.held[dieIndex];
-};
+  const trimmed = name.trim();
+  if (trimmed.length === 0) throw new Error("방 제목을 입력해주세요.");
+  if (trimmed.length > ROOM_NAME_MAX_LENGTH) throw new Error("방 제목이 너무 깁니다.");
 
-export interface ScoreResult {
-  finished: boolean;
-  winnerUserId: string | null;
-}
-
-/**
- * 현재 주사위 값을 지정한 항목에 채운다. 다 채우거나 13턴을 다 쓴 사람이
- * 생기면 게임을 종료 처리한다.
- * @param room - 대상 방
- * @param requesterId - 요청한 게스트 id
- * @param category - 채울 항목
- * @returns 게임 종료 여부와 승자
- */
-export const scoreCategory = (
-  room: RoomState,
-  requesterId: string,
-  category: Category,
-): ScoreResult => {
-  assertTurn(room, requesterId);
-  if (room.rollsLeft === 3) throw new Error("먼저 주사위를 굴려주세요.");
-
-  const player = currentPlayer(room);
-  const score = calculateScore(category, room.dice);
-
-  // 야찌는 이미 채운 뒤에도(진짜 50점) 다시 5개가 같은 눈이면 또 50점이
-  // 쌓인다.
-  if (category === "yahtzee" && player.scorecard.yahtzee) {
-    if (score === 0) throw new Error("이미 채운 항목입니다.");
-    player.scorecard.yahtzee += score;
-  } else {
-    if (player.scorecard[category] !== null) {
-      throw new Error("이미 채운 항목입니다.");
-    }
-    player.scorecard[category] = score;
-  }
-
-  player.turnsTaken += 1;
-  room.dice = [...INITIAL_DICE];
-  room.held = [...INITIAL_HELD];
-  room.rollsLeft = 3;
-
-  // 야찌는 정확히 13턴제라, 반복 야찌를 쌓는 턴도 턴 수에 포함된다. 그래서
-  // 항목이 남은 채로 턴이 끝날 수 있는데, 그런 항목은 0점으로 채워 게임이
-  // 멈추지 않게 한다.
-  const allDone = room.players.every((p) => p.turnsTaken >= TOTAL_TURNS);
-
-  if (allDone) {
-    for (const p of room.players) {
-      for (const cat of CATEGORIES) {
-        if (p.scorecard[cat] === null) p.scorecard[cat] = 0;
-      }
-    }
-    room.status = "FINISHED";
-    let [winner] = room.players;
-    for (const p of room.players) {
-      if (totalScore(p.scorecard) > totalScore(winner.scorecard)) winner = p;
-    }
-    room.winnerUserId = winner.userId;
-    return { finished: true, winnerUserId: winner.userId };
-  }
-
-  room.currentPlayerIndex = (room.currentPlayerIndex + 1) % room.players.length;
-  return { finished: false, winnerUserId: null };
-};
-
-/**
- * 게임이 진행 중이고, 요청자가 현재 차례인지 확인한다. 아니면 예외를 던진다.
- * @param room - 대상 방
- * @param requesterId - 요청한 게스트 id
- */
-const assertTurn = (room: RoomState, requesterId: string): void => {
-  if (room.status !== "PLAYING") throw new Error("게임이 진행 중이 아닙니다.");
-  if (currentPlayer(room)?.userId !== requesterId) {
-    throw new Error("당신의 차례가 아닙니다.");
-  }
+  room.name = trimmed;
+  room.game = idleGame;
 };
 
 export interface PublicPlayerState {
   userId: string;
   nickname: string;
   seat: number;
-  scorecard: Scorecard;
   connected: boolean;
-  total: number;
 }
 
 export interface PublicRoomState {
   code: string;
+  name: string;
   hostId: string;
   maxPlayers: number;
   status: RoomStatus;
   players: PublicPlayerState[];
-  dice: number[];
-  held: boolean[];
-  rollsLeft: number;
-  currentPlayerIndex: number;
-  currentPlayerId: string | null;
-  winnerUserId: string | null;
+  game: PublicGameState;
 }
 
 /**
- * 클라이언트로 보낼 수 있는 형태로 방 상태를 가공한다 (총점 계산 포함).
+ * 클라이언트로 보낼 수 있는 형태로 방 공통 정보를 가공한다. 게임별 상태는
+ * 호출하는 쪽(게임 디스패치)이 채워 넣는다.
  * @param room - 대상 방
+ * @param game - 이미 만들어진 게임별 공개 상태
  * @returns 클라이언트용 방 상태
  */
-export const publicRoomState = (room: RoomState): PublicRoomState => {
+export const publicRoomState = (
+  room: RoomState,
+  game: PublicGameState,
+): PublicRoomState => {
   return {
     code: room.code,
+    name: room.name,
     hostId: room.hostId,
     maxPlayers: room.maxPlayers,
     status: room.status,
@@ -406,15 +258,8 @@ export const publicRoomState = (room: RoomState): PublicRoomState => {
       userId: p.userId,
       nickname: p.nickname,
       seat: p.seat,
-      scorecard: p.scorecard,
       connected: p.connected,
-      total: totalScore(p.scorecard),
     })),
-    dice: room.dice,
-    held: room.held,
-    rollsLeft: room.rollsLeft,
-    currentPlayerIndex: room.currentPlayerIndex,
-    currentPlayerId: room.players[room.currentPlayerIndex]?.userId ?? null,
-    winnerUserId: room.winnerUserId,
+    game,
   };
 };

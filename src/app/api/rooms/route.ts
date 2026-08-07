@@ -10,8 +10,8 @@ const MIN_MAX_PLAYERS = 2;
 const MAX_MAX_PLAYERS = 6;
 const DEFAULT_MAX_PLAYERS = 6;
 const ROOM_NAME_MAX_LENGTH = 20;
-const DEFAULT_ROOM_NAME = "야찌 한 판";
-const SUPPORTED_GAME_TYPES = ["YATZY"];
+const DEFAULT_ROOM_NAME = "한 판 하실 분";
+const SUPPORTED_GAME_TYPES = ["YATZY", "SHITHEAD"];
 
 /**
  * 헷갈리기 쉬운 글자(0/O, 1/I 등)를 뺀 문자로 방 코드를 만든다.

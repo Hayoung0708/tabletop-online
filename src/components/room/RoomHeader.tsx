@@ -1,26 +1,33 @@
 "use client";
 
 import type { JSX } from "react";
+import { GAMES } from "@/constants/games";
 
 export interface RoomHeaderProps {
   roomName: string;
   code: string;
+  /** 현재 방의 게임 종류 id. 아직 상태를 못 받았으면 null (태그 숨김). */
+  gameType: string | null;
   onCopyCode: () => void;
 }
 
 /**
- * 방 이름과, 클릭하면 복사되는 방 코드.
- * @param props - 방 이름/코드와 복사 핸들러
+ * 방 이름과, 클릭하면 복사되는 방 코드. 맨 오른쪽에 현재 진행 중인 게임 태그를 붙인다.
+ * @param props - 방 이름/코드/게임 종류와 복사 핸들러
  * @param props.roomName
  * @param props.code
+ * @param props.gameType
  * @param props.onCopyCode
  * @returns 헤더 엘리먼트
  */
 export const RoomHeader = ({
   roomName,
   code,
+  gameType,
   onCopyCode,
 }: RoomHeaderProps): JSX.Element => {
+  const game = GAMES.find((g) => g.id === gameType);
+
   return (
     <div className="flex items-center gap-3">
       <h1 className="truncate text-xl font-bold">{roomName}</h1>
@@ -42,6 +49,11 @@ export const RoomHeader = ({
           <path d="M5 15H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v1" />
         </svg>
       </button>
+      {game && (
+        <span className="ml-auto shrink-0 rounded-full border border-indigo-500 bg-indigo-950 px-3 py-1 text-sm font-medium text-indigo-200">
+          {game.label}
+        </span>
+      )}
     </div>
   );
 };

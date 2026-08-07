@@ -2,27 +2,43 @@ import "dotenv/config";
 import { createServer } from "node:http";
 import { parse } from "node:url";
 import next from "next";
-import { Server, type DefaultEventsMap } from "socket.io";
+import { Server, type DefaultEventsMap, type RemoteSocket } from "socket.io";
 import { parseCookie } from "cookie";
 import { GUEST_COOKIE } from "@/constants/app";
+import { GAMES } from "@/constants/games";
 import { prisma } from "@/lib/prisma";
-import { totalScore, type Category } from "@/utils/yatzy";
+import type { Category } from "@/utils/yatzy";
 import {
   addPlayer,
-  checkLastPlayerStanding,
+  assertCanStartGame,
   createOrGetRoom,
   deleteRoom,
   getRoom,
   isRoomEmpty,
-  publicRoomState,
   reassignHostIfNeeded,
   removeDisconnectedPlayers,
+  setConnected,
+  updateRoomSettings,
+  type RoomState,
+} from "@/server/roomManager";
+import {
+  buildPublicRoomState,
+  checkLastPlayerStanding,
+  createIdleGame,
+  startGameData,
+} from "@/server/gameDispatch";
+import {
   rollDiceForRoom,
   scoreCategory,
-  setConnected,
-  startGame,
   toggleHold,
-} from "@/server/roomManager";
+  publicYatzyGameState,
+} from "@/server/yatzy/gameLogic";
+import {
+  pickUpPile,
+  playFromFaceDown,
+  playFromHandOrFaceUp,
+  selectFaceUpCards,
+} from "@/server/shithead/gameLogic";
 
 interface SocketData {
   userId: string;
@@ -52,6 +68,61 @@ app.prepare().then(() => {
     httpServer,
     { path: "/socket.io" },
   );
+
+  /**
+   * 방 상태를 방에 있는 모든 소켓에 각자 맞는 시점으로 보낸다. 싯헤드는
+   * 보는 사람마다 손패 노출 여부가 달라서 한 번에 broadcast할 수 없다.
+   * @param room - 대상 방
+   */
+  const broadcastRoomState = async (room: RoomState): Promise<void> => {
+    const sockets: RemoteSocket<DefaultEventsMap, SocketData>[] = await io
+      .in(room.code)
+      .fetchSockets();
+    for (const socket of sockets) {
+      socket.emit("room_state", buildPublicRoomState(room, socket.data.userId));
+    }
+  };
+
+  /**
+   * 야찌 게임이 끝났을 때 각 플레이어의 최종 점수를 DB에 반영한다.
+   * @param room - 대상 방 (game.type === "YATZY")
+   */
+  const persistYatzyResults = async (room: RoomState): Promise<void> => {
+    const { totals } = publicYatzyGameState(room);
+    await Promise.all(
+      room.players.map((p) =>
+        prisma.roomPlayer.update({
+          where: { roomId_playerId: { roomId: room.dbId, playerId: p.userId } },
+          data: { score: totals[p.userId] },
+        }),
+      ),
+    );
+    await prisma.room.update({
+      where: { code: room.code },
+      data: { status: "FINISHED", finishedAt: new Date() },
+    });
+  };
+
+  /**
+   * 싯헤드 게임이 끝났을 때 각 플레이어의 등수를 DB에 반영한다.
+   * @param room - 대상 방 (game.type === "SHITHEAD")
+   */
+  const persistShitheadResults = async (room: RoomState): Promise<void> => {
+    if (room.game.type !== "SHITHEAD") return;
+    const { finishedOrder } = room.game;
+    await Promise.all(
+      room.players.map((p) =>
+        prisma.roomPlayer.update({
+          where: { roomId_playerId: { roomId: room.dbId, playerId: p.userId } },
+          data: { score: finishedOrder.indexOf(p.userId) + 1 },
+        }),
+      ),
+    );
+    await prisma.room.update({
+      where: { code: room.code },
+      data: { status: "FINISHED", finishedAt: new Date() },
+    });
+  };
 
   const lastPlayerTimers = new Map<string, NodeJS.Timeout>();
 
@@ -101,7 +172,7 @@ app.prepare().then(() => {
         console.error(err);
       }
 
-      io.to(room.code).emit("room_state", publicRoomState(room));
+      await broadcastRoomState(room);
       return;
     }
 
@@ -123,7 +194,7 @@ app.prepare().then(() => {
       console.error(err);
     }
 
-    io.to(room.code).emit("room_state", publicRoomState(room));
+    await broadcastRoomState(room);
   };
 
   /**
@@ -150,7 +221,7 @@ app.prepare().then(() => {
     }
 
     if (!isRoomEmpty(room)) {
-      io.to(room.code).emit("room_state", publicRoomState(room));
+      await broadcastRoomState(room);
     }
 
     clearLastPlayerTimer(room.code);
@@ -217,7 +288,14 @@ app.prepare().then(() => {
         roomCode = code;
         socket.join(code);
 
-        const room = createOrGetRoom(dbRoom.id, code, dbRoom.hostId, dbRoom.maxPlayers);
+        const room = createOrGetRoom(
+          dbRoom.id,
+          code,
+          dbRoom.name,
+          dbRoom.hostId,
+          dbRoom.maxPlayers,
+          createIdleGame(dbRoom.gameType),
+        );
 
         if (room.players.length === 0) {
           for (const p of [...dbRoom.players].sort((a, b) => a.seat - b.seat)) {
@@ -228,7 +306,7 @@ app.prepare().then(() => {
         }
 
         clearLastPlayerTimer(code);
-        io.to(code).emit("room_state", publicRoomState(room));
+        await broadcastRoomState(room);
       } catch (err) {
         console.error(err);
         socket.emit("error_message", "방에 참가할 수 없습니다.");
@@ -241,8 +319,9 @@ app.prepare().then(() => {
       if (!room) return;
 
       try {
-        startGame(room, socket.data.userId);
-        // startGame이 여전히 연결 끊긴 사람을 걸러내므로 DB도 맞춰준다.
+        assertCanStartGame(room, socket.data.userId);
+        startGameData(room);
+        // 시작 직전에 연결 끊긴 플레이어를 걸러냈으니 DB도 맞춰준다.
         const kept = room.players.map((p) => p.userId);
         await prisma.roomPlayer.deleteMany({
           where: { roomId: room.dbId, playerId: { notIn: kept } },
@@ -251,36 +330,59 @@ app.prepare().then(() => {
           where: { code: roomCode },
           data: { status: "PLAYING" },
         });
-        io.to(roomCode).emit("room_state", publicRoomState(room));
+        await broadcastRoomState(room);
       } catch (err) {
         socket.emit("error_message", (err as Error).message);
-        // startGame이 실패 전에 이미 연결 끊긴 사람을 걸러냈을 수 있어,
+        // 시작 조건 확인 중 이미 연결 끊긴 플레이어를 걸러냈을 수 있어,
         // 걸러진 목록을 내보내야 방 화면이 낡은 목록을 보여주지 않는다.
-        io.to(roomCode).emit("room_state", publicRoomState(room));
+        await broadcastRoomState(room);
       }
     });
 
-    socket.on("roll_dice", () => {
+    socket.on(
+      "update_room",
+      async ({ name, gameType }: { name: string; gameType: string }) => {
+        if (!roomCode) return;
+        const room = getRoom(roomCode);
+        if (!room) return;
+
+        try {
+          if (!GAMES.some((g) => g.id === gameType && !g.disabled)) {
+            throw new Error("아직 지원하지 않는 게임입니다.");
+          }
+          updateRoomSettings(room, socket.data.userId, name, createIdleGame(gameType));
+          await prisma.room.update({
+            where: { code: roomCode },
+            data: { name: room.name, gameType },
+          });
+          await broadcastRoomState(room);
+        } catch (err) {
+          socket.emit("error_message", (err as Error).message);
+        }
+      },
+    );
+
+    socket.on("roll_dice", async () => {
       if (!roomCode) return;
       const room = getRoom(roomCode);
       if (!room) return;
 
       try {
         rollDiceForRoom(room, socket.data.userId);
-        io.to(roomCode).emit("room_state", publicRoomState(room));
+        await broadcastRoomState(room);
       } catch (err) {
         socket.emit("error_message", (err as Error).message);
       }
     });
 
-    socket.on("toggle_hold", ({ dieIndex }: { dieIndex: number }) => {
+    socket.on("toggle_hold", async ({ dieIndex }: { dieIndex: number }) => {
       if (!roomCode) return;
       const room = getRoom(roomCode);
       if (!room) return;
 
       try {
         toggleHold(room, socket.data.userId, dieIndex);
-        io.to(roomCode).emit("room_state", publicRoomState(room));
+        await broadcastRoomState(room);
       } catch (err) {
         socket.emit("error_message", (err as Error).message);
       }
@@ -293,30 +395,70 @@ app.prepare().then(() => {
 
       try {
         const result = scoreCategory(room, socket.data.userId, category);
-        io.to(roomCode).emit("room_state", publicRoomState(room));
-
-        if (result.finished) {
-          await Promise.all(
-            room.players.map((p) =>
-              prisma.roomPlayer.update({
-                where: { roomId_playerId: { roomId: room.dbId, playerId: p.userId } },
-                data: { score: totalScore(p.scorecard) },
-              }),
-            ),
-          );
-          await prisma.room.update({
-            where: { code: roomCode as string },
-            data: { status: "FINISHED", finishedAt: new Date() },
-          });
-        }
+        await broadcastRoomState(room);
+        if (result.finished) await persistYatzyResults(room);
       } catch (err) {
         socket.emit("error_message", (err as Error).message);
       }
     });
 
-    socket.on("emote", ({ x, y }: { x: number; y: number }) => {
+    socket.on("shithead_select_face_up", async ({ cardIds }: { cardIds: string[] }) => {
       if (!roomCode) return;
-      io.to(roomCode).emit("emote", { x, y, userId: socket.data.userId });
+      const room = getRoom(roomCode);
+      if (!room) return;
+
+      try {
+        selectFaceUpCards(room, socket.data.userId, cardIds);
+        await broadcastRoomState(room);
+      } catch (err) {
+        socket.emit("error_message", (err as Error).message);
+      }
+    });
+
+    socket.on("shithead_play", async ({ cardIds }: { cardIds: string[] }) => {
+      if (!roomCode) return;
+      const room = getRoom(roomCode);
+      if (!room) return;
+
+      try {
+        const result = playFromHandOrFaceUp(room, socket.data.userId, cardIds);
+        await broadcastRoomState(room);
+        if (result.gameOver) await persistShitheadResults(room);
+      } catch (err) {
+        socket.emit("error_message", (err as Error).message);
+      }
+    });
+
+    socket.on("shithead_play_face_down", async ({ index }: { index: number }) => {
+      if (!roomCode) return;
+      const room = getRoom(roomCode);
+      if (!room) return;
+
+      try {
+        const result = playFromFaceDown(room, socket.data.userId, index);
+        await broadcastRoomState(room);
+        if (result.gameOver) await persistShitheadResults(room);
+      } catch (err) {
+        socket.emit("error_message", (err as Error).message);
+      }
+    });
+
+    socket.on("shithead_pick_up_pile", async () => {
+      if (!roomCode) return;
+      const room = getRoom(roomCode);
+      if (!room) return;
+
+      try {
+        pickUpPile(room, socket.data.userId);
+        await broadcastRoomState(room);
+      } catch (err) {
+        socket.emit("error_message", (err as Error).message);
+      }
+    });
+
+    socket.on("emote", ({ emoteId }: { emoteId: string }) => {
+      if (!roomCode) return;
+      io.to(roomCode).emit("emote", { emoteId, userId: socket.data.userId });
     });
 
     // 의도적 퇴장(나가기 버튼) — 유예 없이 즉시 처리한다.

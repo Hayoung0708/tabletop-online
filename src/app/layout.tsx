@@ -17,7 +17,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Tabletop Online",
+  title: "테이블탑 온라인",
   description: "친구들과 실시간으로 즐기는 온라인 야찌",
 };
 
