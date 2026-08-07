@@ -63,23 +63,21 @@ export const ShitheadGameBoard = ({
               ))}
           </div>
 
+          <PileAndDeck pile={game.pile} deckCount={game.deckCount} />
+
           {!me.selectionDone ? (
             <FaceUpSelection hand={me.hand ?? []} onConfirm={selectFaceUp} />
           ) : (
-            <>
-              <PileAndDeck pile={game.pile} deckCount={game.deckCount} />
-
-              <MyZones
-                hand={me.hand ?? []}
-                faceUp={me.faceUp}
-                faceDownCount={me.faceDownCount}
-                pile={game.pile}
-                isMyTurn={isMyTurn}
-                onPlayCards={playCards}
-                onPlayFaceDown={playFaceDownCard}
-                onPickUpPile={pickUpPile}
-              />
-            </>
+            <MyZones
+              hand={me.hand ?? []}
+              faceUp={me.faceUp}
+              faceDownCount={me.faceDownCount}
+              pile={game.pile}
+              isMyTurn={isMyTurn}
+              onPlayCards={playCards}
+              onPlayFaceDown={playFaceDownCard}
+              onPickUpPile={pickUpPile}
+            />
           )}
         </>
       )}
