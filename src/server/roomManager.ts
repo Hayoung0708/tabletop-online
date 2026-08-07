@@ -1,3 +1,4 @@
+import { ROOM_NAME_MAX_LENGTH } from "@/constants/app";
 import type { PublicYatzyGameState, YatzyGameData } from "@/server/yatzy/gameLogic";
 import type {
   PublicShitheadGameState,
@@ -21,6 +22,7 @@ export type RoomStatus = "WAITING" | "PLAYING" | "FINISHED";
 export interface RoomState {
   dbId: string;
   code: string;
+  name: string;
   hostId: string;
   maxPlayers: number;
   status: RoomStatus;
@@ -45,6 +47,7 @@ export const getRoom = (code: string): RoomState | undefined => {
  * 게임인지 몰라도 되게 하기 위함.
  * @param dbId - DB상의 방 id
  * @param code - 방 코드
+ * @param name - 방 제목
  * @param hostId - 방장 게스트 id
  * @param maxPlayers - 최대 인원
  * @param idleGame - 이 방의 게임 종류에 맞는 초기 게임 상태
@@ -53,6 +56,7 @@ export const getRoom = (code: string): RoomState | undefined => {
 export const createOrGetRoom = (
   dbId: string,
   code: string,
+  name: string,
   hostId: string,
   maxPlayers: number,
   idleGame: GameData,
@@ -63,6 +67,7 @@ export const createOrGetRoom = (
   const room: RoomState = {
     dbId,
     code,
+    name,
     hostId,
     maxPlayers,
     status: "WAITING",
@@ -190,6 +195,31 @@ export const assertCanStartGame = (room: RoomState, requesterId: string): void =
   room.status = "PLAYING";
 };
 
+/**
+ * 대기 중에 방장이 방 제목과 게임 종류를 바꾼다. 게임별 초기 상태는 호출하는
+ * 쪽(게임 디스패치)에서 만들어 넘겨준다 — roomManager는 게임을 몰라도 되게 한다.
+ * @param room - 대상 방
+ * @param requesterId - 변경을 요청한 게스트 id
+ * @param name - 새 방 제목
+ * @param idleGame - 새 게임 종류의 초기 상태
+ */
+export const updateRoomSettings = (
+  room: RoomState,
+  requesterId: string,
+  name: string,
+  idleGame: GameData,
+): void => {
+  if (room.hostId !== requesterId) throw new Error("호스트만 변경할 수 있습니다.");
+  if (room.status !== "WAITING") throw new Error("게임 중에는 변경할 수 없습니다.");
+
+  const trimmed = name.trim();
+  if (trimmed.length === 0) throw new Error("방 제목을 입력해주세요.");
+  if (trimmed.length > ROOM_NAME_MAX_LENGTH) throw new Error("방 제목이 너무 깁니다.");
+
+  room.name = trimmed;
+  room.game = idleGame;
+};
+
 export interface PublicPlayerState {
   userId: string;
   nickname: string;
@@ -199,6 +229,7 @@ export interface PublicPlayerState {
 
 export interface PublicRoomState {
   code: string;
+  name: string;
   hostId: string;
   maxPlayers: number;
   status: RoomStatus;
@@ -219,6 +250,7 @@ export const publicRoomState = (
 ): PublicRoomState => {
   return {
     code: room.code,
+    name: room.name,
     hostId: room.hostId,
     maxPlayers: room.maxPlayers,
     status: room.status,

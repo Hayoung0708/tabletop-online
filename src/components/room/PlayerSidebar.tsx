@@ -106,7 +106,7 @@ const EmoteButton = ({
     <button
       onClick={onClick}
       disabled={onCooldown}
-      title="감정표현"
+      title={emote.label}
       className={`relative flex items-center justify-center overflow-hidden rounded-lg border border-slate-800 bg-slate-900/60 transition hover:enabled:bg-slate-800 ${className}`}
     >
       <span className="relative z-0 flex items-center justify-center">{icon}</span>
@@ -237,7 +237,7 @@ export const PlayerSidebar = ({
         );
       })}
       <div className="mt-auto flex flex-col gap-1">
-        <span className="text-xs font-medium text-slate-400">감정표현</span>
+        <span className="text-base font-medium text-slate-400">감정표현</span>
         <div className="flex flex-col gap-1.5">
           <div className="flex gap-1.5">
             {EMOTES.slice(0, 1).map((emote) => (

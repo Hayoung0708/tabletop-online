@@ -14,6 +14,8 @@ export const DICE_SOUND_POOL: readonly string[] = Array.from(
 
 export interface EmoteDef {
   id: string;
+  /** 버튼에 hover했을 때 뜨는 이름(title). */
+  label: string;
   /** 사이드바 버튼에 쓸 아이콘. "/"로 시작하면 이미지, 아니면 이모지 텍스트. */
   icon: string;
   /** 클릭 시 띄울 영상/이미지 (webm 또는 gif). 참가자 카드의 정사각형 슬롯 안에 꽉 채워진다. */
@@ -32,6 +34,7 @@ export interface EmoteDef {
 export const EMOTES: readonly EmoteDef[] = [
   {
     id: "emote-01",
+    label: "?",
     icon: "❓",
     media: "/emotes/emote-01.webm",
     audio: "/emotes/emote-01.m4a",
@@ -41,6 +44,7 @@ export const EMOTES: readonly EmoteDef[] = [
   },
   {
     id: "emote-02-happy",
+    label: "좋아요",
     icon: "/emotes/emote-02-happy.png",
     media: "/emotes/emote-02-happy.gif",
     audio: [
@@ -52,6 +56,7 @@ export const EMOTES: readonly EmoteDef[] = [
   },
   {
     id: "emote-03-sad",
+    label: "으앙",
     icon: "/emotes/emote-03-sad.png",
     media: "/emotes/emote-03-sad.gif",
     audio: ["/emotes/sad-sound-1.wav", "/emotes/sad-sound-2.wav"],

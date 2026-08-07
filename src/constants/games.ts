@@ -2,16 +2,38 @@ export interface GameOption {
   id: string;
   label: string;
   desc: string;
+  /** public/icons 아래의 아이콘 경로. */
   icon: string;
+  /** 추후 업데이트 예정이라 아직 고를 수 없는 게임이면 true. */
+  disabled?: boolean;
 }
 
 /** 로비에서 고를 수 있는 게임 목록 */
 export const GAMES: readonly GameOption[] = [
-  { id: "YATZY", label: "야찌", desc: "주사위 5개, 13턴 점수 대결", icon: "🎲" },
+  {
+    id: "YATZY",
+    label: "야찌",
+    desc: "주사위 5개로 점수판을 채워, 총점이 높은 사람이 승리",
+    icon: "/icons/yatzy.svg",
+  },
   {
     id: "SHITHEAD",
     label: "싯헤드",
-    desc: "카드 52장, 제일 먼저 다 내면 승리",
-    icon: "🃏",
+    desc: "볼 수 없는 바닥패를 깔고, 카드를 가장 먼저 다 내면 승리",
+    icon: "/icons/shithead.svg",
+  },
+  {
+    id: "ONECARD",
+    label: "원카드",
+    desc: "추후 업데이트 예정",
+    icon: "/icons/onecard.svg",
+    disabled: true,
+  },
+  {
+    id: "HULA",
+    label: "훌라",
+    desc: "추후 업데이트 예정",
+    icon: "/icons/hula.svg",
+    disabled: true,
   },
 ];

@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" width="200" height="200">
+<title>야찌</title>
+<g transform="translate(0.00 0.00)">
+<g transform="translate(73 74) rotate(0)"><rect x="-22" y="-22" width="44" height="44" rx="9.68" fill="#4f39f6"/><circle cx="-11.44" cy="-11.44" r="3.96" fill="#ffffff"/><circle cx="11.44" cy="-11.44" r="3.96" fill="#ffffff"/><circle cx="0.00" cy="0.00" r="3.96" fill="#ffffff"/><circle cx="-11.44" cy="11.44" r="3.96" fill="#ffffff"/><circle cx="11.44" cy="11.44" r="3.96" fill="#ffffff"/></g>
+<g transform="translate(127 74) rotate(0)"><rect x="-22" y="-22" width="44" height="44" rx="9.68" fill="#4f39f6"/><circle cx="-11.44" cy="-11.44" r="3.96" fill="#ffffff"/><circle cx="11.44" cy="11.44" r="3.96" fill="#ffffff"/></g>
+<g transform="translate(46 126) rotate(0)"><rect x="-22" y="-22" width="44" height="44" rx="9.68" fill="#4f39f6"/><circle cx="-11.44" cy="-11.44" r="3.96" fill="#ffffff"/><circle cx="0.00" cy="0.00" r="3.96" fill="#ffffff"/><circle cx="11.44" cy="11.44" r="3.96" fill="#ffffff"/></g>
+<g transform="translate(100 126) rotate(0)"><rect x="-22" y="-22" width="44" height="44" rx="9.68" fill="#4f39f6"/><circle cx="-11.44" cy="-11.44" r="3.96" fill="#ffffff"/><circle cx="11.44" cy="-11.44" r="3.96" fill="#ffffff"/><circle cx="-11.44" cy="11.44" r="3.96" fill="#ffffff"/><circle cx="11.44" cy="11.44" r="3.96" fill="#ffffff"/></g>
+<g transform="translate(154 126) rotate(0)"><rect x="-22" y="-22" width="44" height="44" rx="9.68" fill="#4f39f6"/><circle cx="0.00" cy="0.00" r="3.96" fill="#ffffff"/></g>
+</g>
+</svg>

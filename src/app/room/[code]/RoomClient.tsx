@@ -9,6 +9,7 @@ import { RoomHeader } from "@/components/room/RoomHeader";
 import { NicknameForm } from "@/components/room/NicknameForm";
 import { PlayerSidebar } from "@/components/room/PlayerSidebar";
 import { WaitingPanel } from "@/components/room/WaitingPanel";
+import { Rulebook } from "@/components/room/Rulebook";
 import { LeaveConfirmDialog } from "@/components/room/LeaveConfirmDialog";
 import { YatzyGameBoard } from "@/components/room/yatzy/YatzyGameBoard";
 import { ShitheadGameBoard } from "@/components/room/shithead/ShitheadGameBoard";
@@ -68,7 +69,8 @@ export const RoomClient = ({ code, roomName, userId }: RoomClientProps): JSX.Ele
     joined,
     userId,
   );
-  const { startGame, sendEmote, emoteOnCooldown, leaveRoom } = useRoomActions(code);
+  const { startGame, updateRoom, sendEmote, emoteOnCooldown, leaveRoom } =
+    useRoomActions(code);
   const { copied, copyCode } = useCopyRoomCode(code);
 
   // 소켓은 페이지 이동에도 살아남는 싱글턴이라, 이 방을 벗어날 때(버튼,
@@ -112,8 +114,13 @@ export const RoomClient = ({ code, roomName, userId }: RoomClientProps): JSX.Ele
           />
         )}
 
-        <main className="flex w-full max-w-3xl min-h-0 flex-1 flex-col gap-3 overflow-y-auto px-4 py-3 sm:px-6">
-          <RoomHeader roomName={roomName} code={code} onCopyCode={copyCode} />
+        <main className="flex w-full max-w-4xl min-h-0 flex-1 flex-col gap-3 overflow-y-auto px-4 py-3 sm:px-6">
+          <RoomHeader
+            roomName={state?.name ?? roomName}
+            code={code}
+            gameType={state?.game.type ?? null}
+            onCopyCode={copyCode}
+          />
 
           {!joined ? (
             <NicknameForm
@@ -139,8 +146,11 @@ export const RoomClient = ({ code, roomName, userId }: RoomClientProps): JSX.Ele
                   activePlayerCount={activePlayers.length}
                   maxPlayers={state.maxPlayers}
                   isHost={isHost}
+                  roomName={state.name}
+                  gameType={state.game.type}
                   winnerUserId={state.game.winnerUserId}
                   onStartGame={startGame}
+                  onUpdateRoom={updateRoom}
                 />
               )}
 
@@ -164,9 +174,7 @@ export const RoomClient = ({ code, roomName, userId }: RoomClientProps): JSX.Ele
           )}
         </main>
 
-        {joined && state && (
-          <aside className="hidden w-72 shrink-0 border-l border-slate-800 px-4 py-4 sm:block" />
-        )}
+        {joined && state && <Rulebook gameType={state.game.type} />}
       </div>
 
       {copied && (

@@ -8,6 +8,7 @@ import { clearRoomJoined } from "@/utils/roomJoinStorage";
 
 export interface UseRoomActionsResult {
   startGame: () => void;
+  updateRoom: (name: string, gameType: string) => void;
   sendEmote: (emoteId: string) => void;
   /** 감정표현별 쿨타임 진행 여부. true인 동안 버튼을 비활성화한다. */
   emoteOnCooldown: Record<string, boolean>;
@@ -26,6 +27,15 @@ export const useRoomActions = (code: string): UseRoomActionsResult => {
   /** 게임을 시작한다 (방장만 가능). */
   const startGame = (): void => {
     getSocket().emit("start_game");
+  };
+
+  /**
+   * 대기 중 방 제목과 게임 종류를 바꾼다 (방장만 가능).
+   * @param name - 새 방 제목
+   * @param gameType - 새 게임 종류 id
+   */
+  const updateRoom = (name: string, gameType: string): void => {
+    getSocket().emit("update_room", { name, gameType });
   };
 
   /**
@@ -54,5 +64,5 @@ export const useRoomActions = (code: string): UseRoomActionsResult => {
     router.push("/lobby");
   };
 
-  return { startGame, sendEmote, emoteOnCooldown, leaveRoom };
+  return { startGame, updateRoom, sendEmote, emoteOnCooldown, leaveRoom };
 };

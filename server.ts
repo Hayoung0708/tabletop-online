@@ -5,6 +5,7 @@ import next from "next";
 import { Server, type DefaultEventsMap, type RemoteSocket } from "socket.io";
 import { parseCookie } from "cookie";
 import { GUEST_COOKIE } from "@/constants/app";
+import { GAMES } from "@/constants/games";
 import { prisma } from "@/lib/prisma";
 import type { Category } from "@/utils/yatzy";
 import {
@@ -17,6 +18,7 @@ import {
   reassignHostIfNeeded,
   removeDisconnectedPlayers,
   setConnected,
+  updateRoomSettings,
   type RoomState,
 } from "@/server/roomManager";
 import {
@@ -289,6 +291,7 @@ app.prepare().then(() => {
         const room = createOrGetRoom(
           dbRoom.id,
           code,
+          dbRoom.name,
           dbRoom.hostId,
           dbRoom.maxPlayers,
           createIdleGame(dbRoom.gameType),
@@ -335,6 +338,29 @@ app.prepare().then(() => {
         await broadcastRoomState(room);
       }
     });
+
+    socket.on(
+      "update_room",
+      async ({ name, gameType }: { name: string; gameType: string }) => {
+        if (!roomCode) return;
+        const room = getRoom(roomCode);
+        if (!room) return;
+
+        try {
+          if (!GAMES.some((g) => g.id === gameType && !g.disabled)) {
+            throw new Error("아직 지원하지 않는 게임입니다.");
+          }
+          updateRoomSettings(room, socket.data.userId, name, createIdleGame(gameType));
+          await prisma.room.update({
+            where: { code: roomCode },
+            data: { name: room.name, gameType },
+          });
+          await broadcastRoomState(room);
+        } catch (err) {
+          socket.emit("error_message", (err as Error).message);
+        }
+      },
+    );
 
     socket.on("roll_dice", async () => {
       if (!roomCode) return;
