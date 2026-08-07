@@ -4,7 +4,7 @@ import {
   canPlayCards,
   canPlaySingleCard,
   createDeck,
-  isStartingCard,
+  findStarterIndex,
   shouldBurnPile,
   shuffleCards,
 } from "@/server/shithead/deck";
@@ -57,8 +57,11 @@ const asShitheadGame = (room: RoomState): ShitheadGameData => {
 
 /**
  * 싯헤드 게임을 시작한다: 뒷카드 3장 + 손패 6장을 나눠주고(얼굴카드는
- * 아직 비어있음 — 각자 손패에서 3장을 골라야 함), 클로버 3을 든 사람부터
- * 시작하도록 정해둔다. 실제 턴 진행은 전원이 얼굴카드를 고른 뒤 시작된다.
+ * 아직 비어있음 — 각자 손패에서 3장을 골라야 함), 배분된 카드 중 가장
+ * 낮은 카드(보통 클로버 3, 없으면 그다음으로 낮은 카드)를 든 사람부터
+ * 시작하도록 정해둔다. 클로버 3이 아무에게도 배분되지 않고 덱(더미)에
+ * 남아있을 수도 있어서 정확히 클로버 3만 찾으면 안 되고 일반화된 최저
+ * 카드 비교가 필요하다. 실제 턴 진행은 전원이 얼굴카드를 고른 뒤 시작된다.
  * @param room - 대상 방
  */
 export const startShitheadGame = (room: RoomState): void => {
@@ -75,8 +78,8 @@ export const startShitheadGame = (room: RoomState): void => {
     selectionDone[p.userId] = false;
   }
 
-  const starterIndex = room.players.findIndex((p) =>
-    [...hands[p.userId], ...faceDown[p.userId]].some(isStartingCard),
+  const starterIndex = findStarterIndex(
+    room.players.map((p) => [...hands[p.userId], ...faceDown[p.userId]]),
   );
 
   room.game = {
