@@ -3,6 +3,7 @@
 import { useState, type JSX } from "react";
 import { PlayingCard } from "@/components/room/shithead/PlayingCard";
 import { FaceCardSlots } from "@/components/room/shithead/FaceCardSlots";
+import { CardFan } from "@/components/room/shithead/CardFan";
 import type { Card } from "@/server/shithead/deck";
 
 const FACE_UP_PICK_SIZE = 3;
@@ -42,9 +43,9 @@ export const FaceUpSelection = ({
 
   return (
     <div className="flex flex-col items-start gap-3 rounded-xl border border-slate-800 bg-slate-900/40 px-3 pt-3 pb-4">
-      <div className="flex items-end gap-6">
+      <div className="flex w-full items-end gap-6">
         <FaceCardSlots faceUp={[]} faceDownCount={FACE_DOWN_SIZE} />
-        <div className="flex flex-wrap gap-2">
+        <CardFan>
           {hand.map((card) => (
             <PlayingCard
               key={card.id}
@@ -53,7 +54,7 @@ export const FaceUpSelection = ({
               onClick={(): void => toggleCard(card)}
             />
           ))}
-        </div>
+        </CardFan>
       </div>
 
       <div className="flex w-full justify-center">

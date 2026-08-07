@@ -3,6 +3,7 @@
 import { useState, type JSX } from "react";
 import { PlayingCard } from "@/components/room/shithead/PlayingCard";
 import { FaceCardSlots } from "@/components/room/shithead/FaceCardSlots";
+import { CardFan } from "@/components/room/shithead/CardFan";
 import { canPlaySingleCard } from "@/server/shithead/deck";
 import type { Card } from "@/server/shithead/deck";
 
@@ -81,7 +82,7 @@ export const MyZones = ({
 
   return (
     <div className="flex flex-col items-start gap-3 rounded-xl border border-slate-800 bg-slate-900/40 px-3 pt-3 pb-4">
-      <div className="flex items-end gap-6">
+      <div className="flex w-full items-end gap-6">
         <FaceCardSlots
           faceUp={faceUp}
           faceDownCount={faceDownCount}
@@ -90,17 +91,19 @@ export const MyZones = ({
           onToggleFaceUp={hand.length === 0 && isMyTurn ? toggleCard : undefined}
           onFlipFaceDown={isBlindPhase && isMyTurn ? onPlayFaceDown : undefined}
         />
-        <div className="flex flex-wrap gap-2">
-          {hand.map((card) => (
-            <PlayingCard
-              key={card.id}
-              card={card}
-              selected={selectedIds.includes(card.id)}
-              disabled={!isLegal(card)}
-              onClick={isMyTurn ? (): void => toggleCard(card) : undefined}
-            />
-          ))}
-        </div>
+        {hand.length > 0 && (
+          <CardFan>
+            {hand.map((card) => (
+              <PlayingCard
+                key={card.id}
+                card={card}
+                selected={selectedIds.includes(card.id)}
+                disabled={!isLegal(card)}
+                onClick={isMyTurn ? (): void => toggleCard(card) : undefined}
+              />
+            ))}
+          </CardFan>
+        )}
       </div>
 
       {!isBlindPhase && (
