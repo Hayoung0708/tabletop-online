@@ -74,11 +74,9 @@ export const MyZones = ({
     setSelectedIds([]);
   };
 
-  const canPickUp =
-    isMyTurn &&
-    !isBlindPhase &&
-    activeZone.length > 0 &&
-    activeZone.every((c) => !isLegal(c));
+  // 낼 수 있는 카드가 있어도 전략적으로 더미를 주울 수 있다. 블라인드 단계나
+  // 빈 더미일 때만 막는다.
+  const canPickUp = isMyTurn && !isBlindPhase && pile.length > 0;
 
   return (
     <div className="flex flex-col items-start gap-3 rounded-xl border border-slate-800 bg-slate-900/40 px-3 pt-3 pb-4">

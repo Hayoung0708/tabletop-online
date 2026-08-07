@@ -326,7 +326,9 @@ export const playFromFaceDown = (
 };
 
 /**
- * 낼 수 있는 카드가 없을 때 더미 전체를 손패로 가져오고 차례를 넘긴다.
+ * 더미 전체를 손패로 가져오고 차례를 넘긴다. 낼 수 있는 카드가 있어도 전략적으로
+ * 주울 수 있다. 단 손패·얼굴카드가 모두 없는 블라인드 단계에서는 뒷카드를 직접
+ * 뒤집어야 하므로 주울 수 없다.
  * @param room - 대상 방
  * @param requesterId - 요청한 게스트 id
  */
@@ -338,11 +340,6 @@ export const pickUpPile = (room: RoomState, requesterId: string): void => {
   const faceUp = game.faceUp[requesterId];
   if (hand.length === 0 && faceUp.length === 0) {
     throw new Error("뒷카드는 직접 뒤집어야 합니다.");
-  }
-
-  const zone = hand.length > 0 ? hand : faceUp;
-  if (zone.some((c) => canPlaySingleCard(game.pile, c))) {
-    throw new Error("낼 수 있는 카드가 있습니다.");
   }
   if (game.pile.length === 0) throw new Error("가져올 더미가 없습니다.");
 
