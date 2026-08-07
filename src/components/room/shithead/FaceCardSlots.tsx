@@ -2,12 +2,16 @@
 
 import type { JSX } from "react";
 import { PlayingCard } from "@/components/room/shithead/PlayingCard";
+import { useDealing } from "@/components/room/shithead/DealingContext";
+import { SHITHEAD_ANCHOR } from "@/constants/shithead";
 import type { Card } from "@/server/shithead/deck";
 
 export interface FaceCardSlotsProps {
   faceUp: Card[];
   faceDownCount: number;
   selectedIds?: string[];
+  /** 딜 애니메이션 대상 앵커를 붙일 플레이어 id. 없으면 앵커를 달지 않는다. */
+  anchorUserId?: string;
   isFaceUpLegal?: (card: Card) => boolean;
   onToggleFaceUp?: (card: Card) => void;
   onFlipFaceDown?: (index: number) => void;
@@ -21,6 +25,7 @@ export interface FaceCardSlotsProps {
  * @param props.faceUp
  * @param props.faceDownCount
  * @param props.selectedIds
+ * @param props.anchorUserId
  * @param props.isFaceUpLegal
  * @param props.onToggleFaceUp
  * @param props.onFlipFaceDown
@@ -30,10 +35,12 @@ export const FaceCardSlots = ({
   faceUp,
   faceDownCount,
   selectedIds,
+  anchorUserId,
   isFaceUpLegal,
   onToggleFaceUp,
   onFlipFaceDown,
 }: FaceCardSlotsProps): JSX.Element => {
+  const dealing = useDealing();
   return (
     <div className="flex gap-2">
       {Array.from({ length: faceDownCount }, (_, i) => {
@@ -41,17 +48,22 @@ export const FaceCardSlots = ({
         return (
           <div
             key={i}
+            data-anchor={
+              anchorUserId ? SHITHEAD_ANCHOR.faceDownSlot(anchorUserId, i) : undefined
+            }
             className="relative h-[5.625rem] w-14 shrink-0 sm:h-[6.625rem] sm:w-16"
           >
-            <div className="absolute top-2.5 left-0 z-0">
-              <PlayingCard
-                faceDown
-                onClick={
-                  !topCard && onFlipFaceDown ? (): void => onFlipFaceDown(i) : undefined
-                }
-              />
-            </div>
-            {topCard && (
+            {!dealing && (
+              <div className="absolute top-2.5 left-0 z-0">
+                <PlayingCard
+                  faceDown
+                  onClick={
+                    !topCard && onFlipFaceDown ? (): void => onFlipFaceDown(i) : undefined
+                  }
+                />
+              </div>
+            )}
+            {!dealing && topCard && (
               <div className="absolute top-0 left-0 z-10">
                 <PlayingCard
                   card={topCard}

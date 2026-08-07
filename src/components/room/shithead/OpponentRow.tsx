@@ -1,9 +1,12 @@
 "use client";
 
-import type { JSX } from "react";
+import { useRef, type JSX } from "react";
 import { Check, Loader2 } from "lucide-react";
 import { PlayingCard } from "@/components/room/shithead/PlayingCard";
 import { FaceCardSlots } from "@/components/room/shithead/FaceCardSlots";
+import { useDealing } from "@/components/room/shithead/DealingContext";
+import { useHandDealIn } from "@/hooks/shithead/useHandDealIn";
+import { SHITHEAD_ANCHOR } from "@/constants/shithead";
 import type { PublicShitheadPlayer } from "@/server/shithead/gameLogic";
 
 export interface OpponentRowProps {
@@ -30,6 +33,12 @@ export const OpponentRow = ({
   isCurrentTurn,
   showSelectionStatus,
 }: OpponentRowProps): JSX.Element => {
+  const dealing = useDealing();
+  const handRef = useRef<HTMLDivElement>(null);
+  // 상대 손패도 내 손패와 똑같이, 딜 시작에 맞춰 덱에서 직접 날아들며 밀린다.
+  const flying = useHandDealIn(handRef, true);
+  const hidden = dealing && !flying;
+
   return (
     <div
       className={`flex flex-col gap-2 rounded-lg border px-3 pt-2 pb-4 ${
@@ -58,9 +67,23 @@ export const OpponentRow = ({
           ))}
       </div>
 
-      <div className="flex items-start gap-6">
-        <FaceCardSlots faceUp={player.faceUp} faceDownCount={player.faceDownCount} />
-        <div className="flex -space-x-9">
+      <div
+        data-anchor={SHITHEAD_ANCHOR.field(player.userId)}
+        className="flex items-start gap-6"
+      >
+        <FaceCardSlots
+          faceUp={player.faceUp}
+          faceDownCount={player.faceDownCount}
+          anchorUserId={player.userId}
+        />
+        <div
+          ref={handRef}
+          data-anchor={SHITHEAD_ANCHOR.hand(player.userId)}
+          data-hand-align="start"
+          className={`flex min-h-[5.625rem] min-w-14 -space-x-9 sm:min-h-[6.625rem] sm:min-w-16 ${
+            hidden ? "invisible" : ""
+          }`}
+        >
           {Array.from({ length: player.handCount }, (_, i) => (
             <PlayingCard key={i} faceDown />
           ))}

@@ -4,10 +4,12 @@ import { useState, type JSX } from "react";
 import { PlayingCard } from "@/components/room/shithead/PlayingCard";
 import { FaceCardSlots } from "@/components/room/shithead/FaceCardSlots";
 import { CardFan } from "@/components/room/shithead/CardFan";
+import { SHITHEAD_ANCHOR } from "@/constants/shithead";
 import { canPlaySingleCard } from "@/server/shithead/deck";
 import type { Card } from "@/server/shithead/deck";
 
 export interface MyZonesProps {
+  userId: string;
   hand: Card[];
   faceUp: Card[];
   faceDownCount: number;
@@ -23,6 +25,7 @@ export interface MyZonesProps {
  * 그것도 없으면 뒷카드를 뒤집어야 한다. 같은 랭크는 여러 장 선택해서 한
  * 번에 낼 수 있고, 지금 낼 수 없는 카드는 흐리게 표시하고 클릭을 막는다.
  * @param props - 내 카드 상태와 액션 콜백
+ * @param props.userId
  * @param props.hand
  * @param props.faceUp
  * @param props.faceDownCount
@@ -34,6 +37,7 @@ export interface MyZonesProps {
  * @returns 내 카드 영역 엘리먼트
  */
 export const MyZones = ({
+  userId,
   hand,
   faceUp,
   faceDownCount,
@@ -80,28 +84,38 @@ export const MyZones = ({
 
   return (
     <div className="flex flex-col items-start gap-3 rounded-xl border border-slate-800 bg-slate-900/40 px-3 pt-3 pb-4">
-      <div className="flex w-full items-end gap-6">
+      <div
+        data-anchor={SHITHEAD_ANCHOR.field(userId)}
+        className="flex w-full items-end gap-6"
+      >
         <FaceCardSlots
           faceUp={faceUp}
           faceDownCount={faceDownCount}
           selectedIds={hand.length === 0 ? selectedIds : undefined}
+          anchorUserId={userId}
           isFaceUpLegal={hand.length === 0 ? isLegal : (): boolean => false}
           onToggleFaceUp={hand.length === 0 && isMyTurn ? toggleCard : undefined}
           onFlipFaceDown={isBlindPhase && isMyTurn ? onPlayFaceDown : undefined}
         />
-        {hand.length > 0 && (
-          <CardFan>
-            {hand.map((card) => (
-              <PlayingCard
-                key={card.id}
-                card={card}
-                selected={selectedIds.includes(card.id)}
-                disabled={!isLegal(card)}
-                onClick={isMyTurn ? (): void => toggleCard(card) : undefined}
-              />
-            ))}
-          </CardFan>
-        )}
+        <div
+          data-anchor={SHITHEAD_ANCHOR.hand(userId)}
+          data-hand-align="end"
+          className="flex min-h-[5.625rem] min-w-0 flex-1 items-end sm:min-h-[6.625rem]"
+        >
+          {hand.length > 0 && (
+            <CardFan>
+              {hand.map((card) => (
+                <PlayingCard
+                  key={card.id}
+                  card={card}
+                  selected={selectedIds.includes(card.id)}
+                  disabled={!isLegal(card)}
+                  onClick={isMyTurn ? (): void => toggleCard(card) : undefined}
+                />
+              ))}
+            </CardFan>
+          )}
+        </div>
       </div>
 
       {!isBlindPhase && (

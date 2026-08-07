@@ -13,6 +13,8 @@ import { Rulebook } from "@/components/room/Rulebook";
 import { LeaveConfirmDialog } from "@/components/room/LeaveConfirmDialog";
 import { YatzyGameBoard } from "@/components/room/yatzy/YatzyGameBoard";
 import { ShitheadGameBoard } from "@/components/room/shithead/ShitheadGameBoard";
+import { ShitheadCardMotions } from "@/components/room/shithead/ShitheadCardMotions";
+import { DealingProvider } from "@/components/room/shithead/DealingContext";
 import { useNicknameJoin } from "@/hooks/useNicknameJoin";
 import { useRoomSocket } from "@/hooks/useRoomSocket";
 import { useRoomActions } from "@/hooks/useRoomActions";
@@ -100,82 +102,90 @@ export const RoomClient = ({ code, roomName, userId }: RoomClientProps): JSX.Ele
       <AdRail side="left" />
       <AdRail side="right" />
 
-      <div className="flex min-h-0 flex-1 justify-center overflow-hidden">
-        {joined && state && (
-          <PlayerSidebar
-            players={state.players}
-            currentPlayerId={state.game.currentPlayerId}
-            hostId={state.hostId}
-            extraLine={buildSidebarExtraLine(state)}
-            onSendEmote={sendEmote}
-            emoteOnCooldown={emoteOnCooldown}
-            activeEmotes={activeEmotes}
-            onRemoveEmote={removeEmote}
-          />
-        )}
-
-        <main className="flex w-full max-w-4xl min-h-0 flex-1 flex-col gap-3 overflow-y-auto px-4 py-3 sm:px-6">
-          <RoomHeader
-            roomName={state?.name ?? roomName}
-            code={code}
-            gameType={state?.game.type ?? null}
-            onCopyCode={copyCode}
-          />
-
-          {!joined ? (
-            <NicknameForm
-              nickname={nickname}
-              onNicknameChange={setNickname}
-              onSubmit={joinRoom}
-              joining={joining}
-              joinError={joinError}
+      <DealingProvider>
+        <div className="flex min-h-0 flex-1 justify-center overflow-hidden">
+          {joined && state && (
+            <PlayerSidebar
+              players={state.players}
+              currentPlayerId={state.game.currentPlayerId}
+              hostId={state.hostId}
+              extraLine={buildSidebarExtraLine(state)}
+              onSendEmote={sendEmote}
+              emoteOnCooldown={emoteOnCooldown}
+              activeEmotes={activeEmotes}
+              onRemoveEmote={removeEmote}
             />
-          ) : !state ? (
-            <p className="text-slate-400">방에 연결하는 중...</p>
-          ) : (
-            <>
-              {error && (
-                <p className="rounded-md bg-red-950 px-4 py-2 text-sm text-red-300">
-                  {error}
-                </p>
-              )}
-
-              {state.status === "WAITING" && (
-                <WaitingPanel
-                  players={state.players}
-                  activePlayerCount={activePlayers.length}
-                  maxPlayers={state.maxPlayers}
-                  isHost={isHost}
-                  roomName={state.name}
-                  gameType={state.game.type}
-                  winnerUserId={state.game.winnerUserId}
-                  onStartGame={startGame}
-                  onUpdateRoom={updateRoom}
-                />
-              )}
-
-              {(state.status === "PLAYING" || state.status === "FINISHED") &&
-                (state.game.type === "YATZY" ? (
-                  <YatzyGameBoard state={state} userId={userId} onLeaveRoom={leaveRoom} />
-                ) : (
-                  <ShitheadGameBoard
-                    state={state}
-                    userId={userId}
-                    onLeaveRoom={leaveRoom}
-                  />
-                ))}
-
-              {me === null && (
-                <p className="text-sm text-slate-500">
-                  이 방의 참가자가 아닙니다. 로비에서 참가해주세요.
-                </p>
-              )}
-            </>
           )}
-        </main>
 
-        {joined && state && <Rulebook gameType={state.game.type} />}
-      </div>
+          <main className="flex w-full max-w-4xl min-h-0 flex-1 flex-col gap-3 overflow-y-auto px-4 py-3 sm:px-6">
+            <RoomHeader
+              roomName={state?.name ?? roomName}
+              code={code}
+              gameType={state?.game.type ?? null}
+              onCopyCode={copyCode}
+            />
+
+            {!joined ? (
+              <NicknameForm
+                nickname={nickname}
+                onNicknameChange={setNickname}
+                onSubmit={joinRoom}
+                joining={joining}
+                joinError={joinError}
+              />
+            ) : !state ? (
+              <p className="text-slate-400">방에 연결하는 중...</p>
+            ) : (
+              <>
+                {error && (
+                  <p className="rounded-md bg-red-950 px-4 py-2 text-sm text-red-300">
+                    {error}
+                  </p>
+                )}
+
+                {state.status === "WAITING" && (
+                  <WaitingPanel
+                    players={state.players}
+                    activePlayerCount={activePlayers.length}
+                    maxPlayers={state.maxPlayers}
+                    isHost={isHost}
+                    roomName={state.name}
+                    gameType={state.game.type}
+                    winnerUserId={state.game.winnerUserId}
+                    onStartGame={startGame}
+                    onUpdateRoom={updateRoom}
+                  />
+                )}
+
+                {(state.status === "PLAYING" || state.status === "FINISHED") &&
+                  (state.game.type === "YATZY" ? (
+                    <YatzyGameBoard
+                      state={state}
+                      userId={userId}
+                      onLeaveRoom={leaveRoom}
+                    />
+                  ) : (
+                    <ShitheadGameBoard
+                      state={state}
+                      userId={userId}
+                      onLeaveRoom={leaveRoom}
+                    />
+                  ))}
+
+                {me === null && (
+                  <p className="text-sm text-slate-500">
+                    이 방의 참가자가 아닙니다. 로비에서 참가해주세요.
+                  </p>
+                )}
+              </>
+            )}
+          </main>
+
+          {joined && state && <Rulebook gameType={state.game.type} />}
+        </div>
+      </DealingProvider>
+
+      {joined && state?.game.type === "SHITHEAD" && <ShitheadCardMotions />}
 
       {copied && (
         <div

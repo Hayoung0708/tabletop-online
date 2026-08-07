@@ -7,6 +7,7 @@ import { MyZones } from "@/components/room/shithead/MyZones";
 import { FaceUpSelection } from "@/components/room/shithead/FaceUpSelection";
 import { ShitheadFinishedPanel } from "@/components/room/shithead/ShitheadFinishedPanel";
 import { useShitheadActions } from "@/hooks/shithead/useShitheadActions";
+import { useStarterAnnounce } from "@/hooks/shithead/useStarterAnnounce";
 import type { PublicRoomState } from "@/server/roomManager";
 
 export interface ShitheadGameBoardProps {
@@ -31,22 +32,36 @@ export const ShitheadGameBoard = ({
 }: ShitheadGameBoardProps): JSX.Element | null => {
   const { selectFaceUp, playCards, playFaceDownCard, pickUpPile } = useShitheadActions();
 
-  if (state.game.type !== "SHITHEAD") return null;
-  const { game } = state;
+  const game = state.game.type === "SHITHEAD" ? state.game : null;
+  const allSelected = game ? game.players.every((p) => p.selectionDone) : false;
+  /**
+   * 게스트 id로 닉네임을 찾는다.
+   * @param id - 찾을 게스트 id
+   * @returns 닉네임, 없으면 "-"
+   */
+  const nicknameOf = (id: string): string =>
+    state.players.find((p) => p.userId === id)?.nickname ?? "-";
+  const starterAnnounce = useStarterAnnounce(
+    allSelected,
+    nicknameOf(game?.currentPlayerId ?? ""),
+  );
+
+  if (!game) return null;
   const me = game.players.find((p) => p.userId === userId);
   if (!me) return null;
 
   const isMyTurn = game.currentPlayerId === userId;
-  const allSelected = game.players.every((p) => p.selectionDone);
-  /**
-   * 게스트 id로 닉네임을 찾는다.
-   * @param id - 찾을 게스트 id
-   */
-  const nicknameOf = (id: string): string =>
-    state.players.find((p) => p.userId === id)?.nickname ?? "-";
 
   return (
     <>
+      {starterAnnounce && (
+        <div className="pointer-events-none fixed inset-0 z-50 flex items-center justify-center">
+          <div className="rounded-2xl bg-slate-900/90 px-8 py-5 text-2xl font-bold text-indigo-200 shadow-xl ring-1 ring-indigo-500">
+            {starterAnnounce}님부터 시작!
+          </div>
+        </div>
+      )}
+
       {state.status === "PLAYING" && (
         <>
           <div className="flex flex-col gap-2">
@@ -66,9 +81,14 @@ export const ShitheadGameBoard = ({
           <PileAndDeck pile={game.pile} deckCount={game.deckCount} />
 
           {!me.selectionDone ? (
-            <FaceUpSelection hand={me.hand ?? []} onConfirm={selectFaceUp} />
+            <FaceUpSelection
+              userId={userId}
+              hand={me.hand ?? []}
+              onConfirm={selectFaceUp}
+            />
           ) : (
             <MyZones
+              userId={userId}
               hand={me.hand ?? []}
               faceUp={me.faceUp}
               faceDownCount={me.faceDownCount}

@@ -25,9 +25,11 @@ export interface PlayingCardProps {
 const CARD_BASE_CLASS =
   "flex shrink-0 flex-col items-center justify-center gap-0.5 rounded-lg border-2 font-bold shadow transition-all duration-150";
 
+// large는 normal을 1.25배한 치수 — 브레이크포인트별 가로세로 비율을 normal과
+// 똑같이 맞춰서(0.70 / 0.667) 덱·더미 카드가 손패 카드와 같은 비율로 보이게 한다.
 const SIZE_CLASS: Record<NonNullable<PlayingCardProps["size"]>, string> = {
   normal: "h-20 w-14 text-lg sm:h-24 sm:w-16",
-  large: "h-24 w-16 text-xl sm:h-28 sm:w-20",
+  large: "h-[6.25rem] w-[4.375rem] text-xl sm:h-[7.5rem] sm:w-20",
 };
 
 const FACE_DOWN_ACTIVE_CLASS =

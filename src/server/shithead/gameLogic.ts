@@ -191,6 +191,8 @@ export interface PlayResult {
   finished: boolean;
   gameOver: boolean;
   winnerUserId: string | null;
+  /** 이번에 더미로 나간 카드들 (애니메이션용). 주운 경우처럼 안 나갔으면 빈 배열. */
+  played: Card[];
 }
 
 /**
@@ -210,12 +212,14 @@ const hasNoCardsLeft = (game: ShitheadGameData, userId: string): boolean =>
  * @param room - 대상 방
  * @param game - 싯헤드 게임 상태
  * @param requesterId - 방금 카드를 낸 플레이어
+ * @param played - 이번에 더미로 나간 카드들
  * @returns 완주/게임종료 여부
  */
 const resolveAfterPlay = (
   room: RoomState,
   game: ShitheadGameData,
   requesterId: string,
+  played: Card[],
 ): PlayResult => {
   const burned = shouldBurnPile(game.pile);
   if (burned) game.pile = [];
@@ -229,7 +233,12 @@ const resolveAfterPlay = (
   if (stillPlaying.length <= 1) {
     if (stillPlaying.length === 1) game.finishedOrder.push(stillPlaying[0].userId);
     room.status = "FINISHED";
-    return { finished, gameOver: true, winnerUserId: game.finishedOrder[0] ?? null };
+    return {
+      finished,
+      gameOver: true,
+      winnerUserId: game.finishedOrder[0] ?? null,
+      played,
+    };
   }
 
   // 더미를 태웠거나(10, 4장 매치) 완주해서 이 자리가 빠지는 경우가 아니면
@@ -238,7 +247,7 @@ const resolveAfterPlay = (
     game.currentPlayerIndex = findNextActiveIndex(room, game, game.currentPlayerIndex);
   }
 
-  return { finished, gameOver: false, winnerUserId: null };
+  return { finished, gameOver: false, winnerUserId: null, played };
 };
 
 /**
@@ -285,7 +294,7 @@ export const playFromHandOrFaceUp = (
     refillHand(game, requesterId);
   }
 
-  return resolveAfterPlay(room, game, requesterId);
+  return resolveAfterPlay(room, game, requesterId, selected);
 };
 
 /**
@@ -301,7 +310,7 @@ export const playFromFaceDown = (
   room: RoomState,
   requesterId: string,
   index: number,
-): PlayResult & { accepted: boolean } => {
+): PlayResult & { accepted: boolean; pickedUp: number } => {
   const game = asShitheadGame(room);
   assertTurn(room, game, requesterId);
   if (game.hands[requesterId].length > 0 || game.faceUp[requesterId].length > 0) {
@@ -315,14 +324,26 @@ export const playFromFaceDown = (
 
   if (canPlaySingleCard(game.pile, card)) {
     game.pile.push(card);
-    return { ...resolveAfterPlay(room, game, requesterId), accepted: true };
+    return {
+      ...resolveAfterPlay(room, game, requesterId, [card]),
+      accepted: true,
+      pickedUp: 0,
+    };
   }
 
-  // 낼 수 없는 카드 — 더미 전체와 함께 손패로 가져오고 차례가 넘어간다.
+  // 낼 수 없는 카드 — 뒤집은 카드 + 더미 전체를 손패로 가져오고 차례가 넘어간다.
+  const pickedUp = game.pile.length + 1;
   game.hands[requesterId].push(card, ...game.pile);
   game.pile = [];
   game.currentPlayerIndex = findNextActiveIndex(room, game, game.currentPlayerIndex);
-  return { finished: false, gameOver: false, winnerUserId: null, accepted: false };
+  return {
+    finished: false,
+    gameOver: false,
+    winnerUserId: null,
+    played: [],
+    accepted: false,
+    pickedUp,
+  };
 };
 
 /**
@@ -331,8 +352,9 @@ export const playFromFaceDown = (
  * 뒤집어야 하므로 주울 수 없다.
  * @param room - 대상 방
  * @param requesterId - 요청한 게스트 id
+ * @returns 손패로 가져온 카드 수(애니메이션용)
  */
-export const pickUpPile = (room: RoomState, requesterId: string): void => {
+export const pickUpPile = (room: RoomState, requesterId: string): number => {
   const game = asShitheadGame(room);
   assertTurn(room, game, requesterId);
 
@@ -343,9 +365,11 @@ export const pickUpPile = (room: RoomState, requesterId: string): void => {
   }
   if (game.pile.length === 0) throw new Error("가져올 더미가 없습니다.");
 
+  const takenCount = game.pile.length;
   hand.push(...game.pile);
   game.pile = [];
   game.currentPlayerIndex = findNextActiveIndex(room, game, game.currentPlayerIndex);
+  return takenCount;
 };
 
 export interface LastPlayerStandingResult {

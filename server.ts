@@ -321,6 +321,11 @@ app.prepare().then(() => {
       try {
         assertCanStartGame(room, socket.data.userId);
         startGameData(room);
+        if (room.game.type === "SHITHEAD") {
+          io.to(roomCode).emit("shithead_deal", {
+            playerIds: room.players.map((p) => p.userId),
+          });
+        }
         // 시작 직전에 연결 끊긴 플레이어를 걸러냈으니 DB도 맞춰준다.
         const kept = room.players.map((p) => p.userId);
         await prisma.roomPlayer.deleteMany({
@@ -422,6 +427,12 @@ app.prepare().then(() => {
 
       try {
         const result = playFromHandOrFaceUp(room, socket.data.userId, cardIds);
+        if (result.played.length > 0) {
+          io.to(roomCode).emit("shithead_play", {
+            playerId: socket.data.userId,
+            cards: result.played,
+          });
+        }
         await broadcastRoomState(room);
         if (result.gameOver) await persistShitheadResults(room);
       } catch (err) {
@@ -436,6 +447,17 @@ app.prepare().then(() => {
 
       try {
         const result = playFromFaceDown(room, socket.data.userId, index);
+        if (result.played.length > 0) {
+          io.to(roomCode).emit("shithead_play", {
+            playerId: socket.data.userId,
+            cards: result.played,
+          });
+        } else if (result.pickedUp > 0) {
+          io.to(roomCode).emit("shithead_pickup", {
+            playerId: socket.data.userId,
+            count: result.pickedUp,
+          });
+        }
         await broadcastRoomState(room);
         if (result.gameOver) await persistShitheadResults(room);
       } catch (err) {
@@ -449,7 +471,11 @@ app.prepare().then(() => {
       if (!room) return;
 
       try {
-        pickUpPile(room, socket.data.userId);
+        const taken = pickUpPile(room, socket.data.userId);
+        io.to(roomCode).emit("shithead_pickup", {
+          playerId: socket.data.userId,
+          count: taken,
+        });
         await broadcastRoomState(room);
       } catch (err) {
         socket.emit("error_message", (err as Error).message);
