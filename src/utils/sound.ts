@@ -25,6 +25,15 @@ export const playSound = (src: string): void => {
 };
 
 /**
+ * 오디오 소스 하나 또는 후보 목록을 받아 재생한다. 목록이면 무작위로 하나 고른다.
+ * @param src - 오디오 파일 경로 또는 후보 목록
+ */
+export const playRandomSound = (src: string | readonly string[]): void => {
+  const picked = Array.isArray(src) ? src[Math.floor(Math.random() * src.length)] : src;
+  playSound(picked);
+};
+
+/**
  * 여러 주사위가 동시에 굴러가는 소리를 재생한다.
  * @param diceCount - 굴러가는 주사위 개수
  */

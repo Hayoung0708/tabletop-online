@@ -1,12 +1,16 @@
 "use client";
 
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { getSocket } from "@/lib/socket";
+import { EMOTES } from "@/constants/media";
 import { clearRoomJoined } from "@/utils/roomJoinStorage";
 
 export interface UseRoomActionsResult {
   startGame: () => void;
-  sendEmote: () => void;
+  sendEmote: (emoteId: string) => void;
+  /** 감정표현별 쿨타임 진행 여부. true인 동안 버튼을 비활성화한다. */
+  emoteOnCooldown: Record<string, boolean>;
   leaveRoom: () => void;
 }
 
@@ -17,17 +21,28 @@ export interface UseRoomActionsResult {
  */
 export const useRoomActions = (code: string): UseRoomActionsResult => {
   const router = useRouter();
+  const [emoteOnCooldown, setEmoteOnCooldown] = useState<Record<string, boolean>>({});
 
   /** 게임을 시작한다 (방장만 가능). */
   const startGame = (): void => {
     getSocket().emit("start_game");
   };
 
-  /** 화면 위 무작위 위치에 감정표현을 띄운다. */
-  const sendEmote = (): void => {
-    const x = 10 + Math.random() * 75;
-    const y = 10 + Math.random() * 75;
-    getSocket().emit("emote", { x, y });
+  /**
+   * 감정표현을 보낸다. 쿨타임이 걸려 있는 종류는 그 안에 다시 누르면 무시한다.
+   * @param emoteId - 보낼 감정표현 종류
+   */
+  const sendEmote = (emoteId: string): void => {
+    if (emoteOnCooldown[emoteId]) return;
+
+    const cooldownMs = EMOTES.find((e) => e.id === emoteId)?.cooldownMs ?? 0;
+    if (cooldownMs > 0) {
+      setEmoteOnCooldown((prev) => ({ ...prev, [emoteId]: true }));
+      setTimeout(() => {
+        setEmoteOnCooldown((prev) => ({ ...prev, [emoteId]: false }));
+      }, cooldownMs);
+    }
+    getSocket().emit("emote", { emoteId });
   };
 
   /** 방을 나가고 로비로 이동한다. */
@@ -39,5 +54,5 @@ export const useRoomActions = (code: string): UseRoomActionsResult => {
     router.push("/lobby");
   };
 
-  return { startGame, sendEmote, leaveRoom };
+  return { startGame, sendEmote, emoteOnCooldown, leaveRoom };
 };

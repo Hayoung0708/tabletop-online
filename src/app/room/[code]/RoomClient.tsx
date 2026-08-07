@@ -9,7 +9,6 @@ import { RoomHeader } from "@/components/room/RoomHeader";
 import { NicknameForm } from "@/components/room/NicknameForm";
 import { PlayerSidebar } from "@/components/room/PlayerSidebar";
 import { WaitingPanel } from "@/components/room/WaitingPanel";
-import { EmoteOverlay } from "@/components/room/EmoteOverlay";
 import { LeaveConfirmDialog } from "@/components/room/LeaveConfirmDialog";
 import { YatzyGameBoard } from "@/components/room/yatzy/YatzyGameBoard";
 import { ShitheadGameBoard } from "@/components/room/shithead/ShitheadGameBoard";
@@ -69,7 +68,7 @@ export const RoomClient = ({ code, roomName, userId }: RoomClientProps): JSX.Ele
     joined,
     userId,
   );
-  const { startGame, sendEmote, leaveRoom } = useRoomActions(code);
+  const { startGame, sendEmote, emoteOnCooldown, leaveRoom } = useRoomActions(code);
   const { copied, copyCode } = useCopyRoomCode(code);
 
   // 소켓은 페이지 이동에도 살아남는 싱글턴이라, 이 방을 벗어날 때(버튼,
@@ -98,7 +97,6 @@ export const RoomClient = ({ code, roomName, userId }: RoomClientProps): JSX.Ele
       <SiteHeader onExit={handleExit} />
       <AdRail side="left" />
       <AdRail side="right" />
-      <EmoteOverlay activeEmotes={activeEmotes} onRemoveEmote={removeEmote} />
 
       <div className="flex min-h-0 flex-1 justify-center overflow-hidden">
         {joined && state && (
@@ -108,6 +106,9 @@ export const RoomClient = ({ code, roomName, userId }: RoomClientProps): JSX.Ele
             hostId={state.hostId}
             extraLine={buildSidebarExtraLine(state)}
             onSendEmote={sendEmote}
+            emoteOnCooldown={emoteOnCooldown}
+            activeEmotes={activeEmotes}
+            onRemoveEmote={removeEmote}
           />
         )}
 
@@ -164,7 +165,7 @@ export const RoomClient = ({ code, roomName, userId }: RoomClientProps): JSX.Ele
         </main>
 
         {joined && state && (
-          <aside className="hidden w-52 shrink-0 border-l border-slate-800 px-4 py-4 sm:block" />
+          <aside className="hidden w-72 shrink-0 border-l border-slate-800 px-4 py-4 sm:block" />
         )}
       </div>
 

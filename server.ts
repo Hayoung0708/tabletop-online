@@ -430,9 +430,9 @@ app.prepare().then(() => {
       }
     });
 
-    socket.on("emote", ({ x, y }: { x: number; y: number }) => {
+    socket.on("emote", ({ emoteId }: { emoteId: string }) => {
       if (!roomCode) return;
-      io.to(roomCode).emit("emote", { x, y, userId: socket.data.userId });
+      io.to(roomCode).emit("emote", { emoteId, userId: socket.data.userId });
     });
 
     // 의도적 퇴장(나가기 버튼) — 유예 없이 즉시 처리한다.
