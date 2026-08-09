@@ -103,7 +103,7 @@ export const MyZones = ({
           className="flex min-h-[5.625rem] min-w-0 flex-1 items-end sm:min-h-[6.625rem]"
         >
           {hand.length > 0 && (
-            <CardFan>
+            <CardFan cardKeys={hand.map((c) => c.id)} playerId={userId}>
               {hand.map((card) => (
                 <PlayingCard
                   key={card.id}

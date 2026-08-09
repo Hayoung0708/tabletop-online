@@ -24,6 +24,9 @@ export const HAND_DEAL_INTRA_MS = 190;
 /** 바닥패 슬롯에서 뒷카드가 컨테이너 상단으로부터 내려앉은 오프셋(px, top-2.5). */
 export const FACE_DOWN_SLOT_TOP_PX = 10;
 
+/** 손패에 카드가 새로 들어올 때 기존 카드가 옆으로 밀리는 시간(ms). */
+export const HAND_SHIFT_MS = 320;
+
 /** 바닥패 3자리를 돌린 뒤 손패 딜이 시작되는 시점(ms, 딜 시작 기준). */
 export const HAND_PHASE_OFFSET_MS = FACE_DOWN_DEAL_SLOTS * CARD_FLIGHT_STAGGER_MS;
 
@@ -38,8 +41,18 @@ export const SHITHEAD_DEAL_TOTAL_MS =
   CARD_FLIGHT_DURATION_MS +
   150;
 
-/** 시작 플레이어 안내 토스트 노출 시간(ms). */
+/** 시작 플레이어 안내 토스트가 나타난 뒤 사라지기 시작할 때까지의 시간(ms). */
 export const STARTER_TOAST_MS = 2200;
+
+/** 등장(animate.css bounceInUp) 재생 시간(ms). */
+export const STARTER_TOAST_ENTER_MS = 900;
+
+/**
+ * 퇴장(animate.css bounceOutDown) 재생 시간(ms). animate.css의 bounceOut 계열은
+ * 실제로 --animate-duration의 0.75배 동안 재생되므로, 토스트를 지우는 타이밍은
+ * 넉넉하게 이 값 그대로 기다린다.
+ */
+export const STARTER_TOAST_EXIT_MS = 800;
 
 /** DOM 앵커 이름 — 카드가 날아갈 출발/도착 지점을 찾는 데 쓴다. */
 export const SHITHEAD_ANCHOR = {

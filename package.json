@@ -16,6 +16,7 @@
   "dependencies": {
     "@prisma/adapter-pg": "^7.9.1",
     "@prisma/client": "^7.9.1",
+    "animate.css": "^4.1.1",
     "cookie": "^2.0.1",
     "lottie-web": "^5.13.0",
     "lucide-react": "^1.29.0",

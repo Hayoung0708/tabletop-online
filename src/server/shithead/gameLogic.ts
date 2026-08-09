@@ -183,7 +183,9 @@ const findNextActiveIndex = (
 const refillHand = (game: ShitheadGameData, userId: string): void => {
   const hand = game.hands[userId];
   while (hand.length < HAND_REFILL_TARGET && game.deck.length > 0) {
-    hand.push(game.deck.pop() as Card);
+    // 새로 뽑은 카드는 손패 맨 앞(화면 왼쪽)에 넣는다 — 화면에서는 왼쪽으로
+    // 들어오면서 기존 카드를 오른쪽으로 밀어내는 연출이 된다.
+    hand.unshift(game.deck.pop() as Card);
   }
 };
 
@@ -193,6 +195,8 @@ export interface PlayResult {
   winnerUserId: string | null;
   /** 이번에 더미로 나간 카드들 (애니메이션용). 주운 경우처럼 안 나갔으면 빈 배열. */
   played: Card[];
+  /** 카드를 낸 뒤 덱에서 손패로 보충한 장수 (애니메이션용). */
+  refilled: number;
 }
 
 /**
@@ -213,6 +217,7 @@ const hasNoCardsLeft = (game: ShitheadGameData, userId: string): boolean =>
  * @param game - 싯헤드 게임 상태
  * @param requesterId - 방금 카드를 낸 플레이어
  * @param played - 이번에 더미로 나간 카드들
+ * @param refilled - 덱에서 손패로 보충한 장수
  * @returns 완주/게임종료 여부
  */
 const resolveAfterPlay = (
@@ -220,6 +225,7 @@ const resolveAfterPlay = (
   game: ShitheadGameData,
   requesterId: string,
   played: Card[],
+  refilled: number,
 ): PlayResult => {
   const burned = shouldBurnPile(game.pile);
   if (burned) game.pile = [];
@@ -238,6 +244,7 @@ const resolveAfterPlay = (
       gameOver: true,
       winnerUserId: game.finishedOrder[0] ?? null,
       played,
+      refilled,
     };
   }
 
@@ -247,7 +254,7 @@ const resolveAfterPlay = (
     game.currentPlayerIndex = findNextActiveIndex(room, game, game.currentPlayerIndex);
   }
 
-  return { finished, gameOver: false, winnerUserId: null, played };
+  return { finished, gameOver: false, winnerUserId: null, played, refilled };
 };
 
 /**
@@ -290,11 +297,13 @@ export const playFromHandOrFaceUp = (
 
   // 손패에서 냈고 덱에 남은 카드가 있으면, 낸 만큼 곧바로 다시 3장을 채운다
   // (얼굴카드에서 낸 경우는 손패 단계가 끝난 것이므로 채우지 않는다).
+  const beforeRefill = hand.length;
   if (playedFromHand && game.deck.length > 0) {
     refillHand(game, requesterId);
   }
+  const refilled = hand.length - beforeRefill;
 
-  return resolveAfterPlay(room, game, requesterId, selected);
+  return resolveAfterPlay(room, game, requesterId, selected, refilled);
 };
 
 /**
@@ -325,7 +334,7 @@ export const playFromFaceDown = (
   if (canPlaySingleCard(game.pile, card)) {
     game.pile.push(card);
     return {
-      ...resolveAfterPlay(room, game, requesterId, [card]),
+      ...resolveAfterPlay(room, game, requesterId, [card], 0),
       accepted: true,
       pickedUp: 0,
     };
@@ -341,6 +350,7 @@ export const playFromFaceDown = (
     gameOver: false,
     winnerUserId: null,
     played: [],
+    refilled: 0,
     accepted: false,
     pickedUp,
   };

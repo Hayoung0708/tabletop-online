@@ -6,6 +6,7 @@ import { PileAndDeck } from "@/components/room/shithead/PileAndDeck";
 import { MyZones } from "@/components/room/shithead/MyZones";
 import { FaceUpSelection } from "@/components/room/shithead/FaceUpSelection";
 import { ShitheadFinishedPanel } from "@/components/room/shithead/ShitheadFinishedPanel";
+import { StarterAnnounceToast } from "@/components/room/shithead/StarterAnnounceToast";
 import { useShitheadActions } from "@/hooks/shithead/useShitheadActions";
 import { useStarterAnnounce } from "@/hooks/shithead/useStarterAnnounce";
 import type { PublicRoomState } from "@/server/roomManager";
@@ -54,13 +55,7 @@ export const ShitheadGameBoard = ({
 
   return (
     <>
-      {starterAnnounce && (
-        <div className="pointer-events-none fixed inset-0 z-50 flex items-center justify-center">
-          <div className="rounded-2xl bg-slate-900/90 px-8 py-5 text-2xl font-bold text-indigo-200 shadow-xl ring-1 ring-indigo-500">
-            {starterAnnounce}님부터 시작!
-          </div>
-        </div>
-      )}
+      <StarterAnnounceToast announce={starterAnnounce} />
 
       {state.status === "PLAYING" && (
         <>

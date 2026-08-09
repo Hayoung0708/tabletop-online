@@ -6,6 +6,7 @@ import { PlayingCard } from "@/components/room/shithead/PlayingCard";
 import { FaceCardSlots } from "@/components/room/shithead/FaceCardSlots";
 import { useDealing } from "@/components/room/shithead/DealingContext";
 import { useHandDealIn } from "@/hooks/shithead/useHandDealIn";
+import { useHandGrowIn } from "@/hooks/shithead/useHandGrowIn";
 import { SHITHEAD_ANCHOR } from "@/constants/shithead";
 import type { PublicShitheadPlayer } from "@/server/shithead/gameLogic";
 
@@ -38,6 +39,12 @@ export const OpponentRow = ({
   // 상대 손패도 내 손패와 똑같이, 딜 시작에 맞춰 덱에서 직접 날아들며 밀린다.
   const flying = useHandDealIn(handRef, true);
   const hidden = dealing && !flying;
+  // 상대 손패는 뒷면이라 카드 구분이 없다. 오른쪽 끝을 기준으로 키를 매기면
+  // 장수가 늘 때 새 카드가 맨 왼쪽으로 들어오고 나머지가 오른쪽으로 밀린다.
+  const handKeys = Array.from({ length: player.handCount }, (_, i) =>
+    String(player.handCount - i),
+  );
+  useHandGrowIn(handRef, handKeys, player.userId, !dealing);
 
   return (
     <div
@@ -84,8 +91,10 @@ export const OpponentRow = ({
             hidden ? "invisible" : ""
           }`}
         >
-          {Array.from({ length: player.handCount }, (_, i) => (
-            <PlayingCard key={i} faceDown />
+          {handKeys.map((key) => (
+            <div key={key} className="relative">
+              <PlayingCard faceDown />
+            </div>
           ))}
         </div>
       </div>

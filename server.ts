@@ -431,6 +431,7 @@ app.prepare().then(() => {
           io.to(roomCode).emit("shithead_play", {
             playerId: socket.data.userId,
             cards: result.played,
+            refilled: result.refilled,
           });
         }
         await broadcastRoomState(room);
@@ -451,6 +452,7 @@ app.prepare().then(() => {
           io.to(roomCode).emit("shithead_play", {
             playerId: socket.data.userId,
             cards: result.played,
+            refilled: result.refilled,
           });
         } else if (result.pickedUp > 0) {
           io.to(roomCode).emit("shithead_pickup", {
