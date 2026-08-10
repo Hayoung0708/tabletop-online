@@ -19,16 +19,16 @@ export interface PlayingCardProps {
   selected?: boolean;
   onClick?: () => void;
   disabled?: boolean;
-  size?: "normal" | "large";
 }
 
 const CARD_BASE_CLASS =
-  "flex shrink-0 flex-col items-center justify-center gap-0.5 rounded-lg border-2 font-bold shadow transition-all duration-150";
+  // transition은 transform에만 건다 — 색까지 전이시키면 더미 맨 위 카드가
+  // 빨강↔검정으로 바뀔 때 이전 색이 잠깐 남아 반대 색으로 반짝인다.
+  "flex shrink-0 flex-col items-center justify-center gap-0.5 rounded-lg border-2 font-bold shadow transition-transform duration-150";
 
-const SIZE_CLASS: Record<NonNullable<PlayingCardProps["size"]>, string> = {
-  normal: "h-20 w-14 text-lg sm:h-24 sm:w-16",
-  large: "h-24 w-16 text-xl sm:h-28 sm:w-20",
-};
+// 카드는 어디서나 같은 크기다 — 덱/더미만 크게 그리면 손패에서 날아갈 때
+// 확대·축소가 필요해지고, 글자와 아이콘 비율이 미묘하게 달라 티가 난다.
+const SIZE_CLASS = "h-20 w-14 text-lg sm:h-24 sm:w-16";
 
 const FACE_DOWN_ACTIVE_CLASS =
   "border-indigo-700 bg-indigo-900 bg-[repeating-linear-gradient(45deg,theme(colors.indigo.800),theme(colors.indigo.800)_4px,theme(colors.indigo.900)_4px,theme(colors.indigo.900)_8px)]";
@@ -46,7 +46,6 @@ const FACE_DOWN_DISABLED_CLASS =
  * @param props.selected
  * @param props.onClick
  * @param props.disabled
- * @param props.size
  * @returns 카드 엘리먼트
  */
 export const PlayingCard = ({
@@ -55,9 +54,8 @@ export const PlayingCard = ({
   selected,
   onClick,
   disabled,
-  size = "normal",
 }: PlayingCardProps): JSX.Element => {
-  const sizeClass = SIZE_CLASS[size];
+  const sizeClass = SIZE_CLASS;
 
   if (faceDown || !card) {
     return (
@@ -90,6 +88,7 @@ export const PlayingCard = ({
   return (
     <button
       type="button"
+      data-card-id={card.id}
       onClick={onClick}
       disabled={disabled || !onClick}
       className={`${CARD_BASE_CLASS} ${sizeClass} ${colorClass} ${
@@ -97,10 +96,7 @@ export const PlayingCard = ({
       }`}
     >
       <span>{card.rank}</span>
-      <SuitIcon
-        className={size === "large" ? "h-5 w-5" : "h-4 w-4"}
-        fill="currentColor"
-      />
+      <SuitIcon className="h-4 w-4" fill="currentColor" />
     </button>
   );
 };

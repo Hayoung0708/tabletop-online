@@ -43,11 +43,14 @@ const NORMAL_RANK_ORDER: readonly Rank[] = [
 const BURN_STACK_SIZE = 4;
 
 /**
- * 카드 랭크가 어떤 카드 위에도 낼 수 있는 와일드(2, 10)인지 확인한다.
+ * 카드 랭크가 어떤 카드 위에도 낼 수 있는 와일드(2, 7, 10)인지 확인한다.
+ * 7은 내는 조건만 와일드이고, 낸 뒤 다음 사람이 봐야 할 기준은
+ * getEffectiveTopCard가 따로 처리한다(7 아래 카드 기준).
  * @param rank - 확인할 랭크
  * @returns 와일드 여부
  */
-export const isWildRank = (rank: Rank): boolean => rank === "2" || rank === "10";
+export const isWildRank = (rank: Rank): boolean =>
+  rank === "2" || rank === "7" || rank === "10";
 
 /**
  * 조커 없는 표준 52장 덱을 만든다.
@@ -84,6 +87,38 @@ const SUIT_STARTING_ORDER: Record<Suit, number> = {
   hearts: 2,
   spades: 3,
 };
+
+/** 손패 화면 정렬용 랭크 오름차순 순서 — 2가 가장 왼쪽, A가 가장 오른쪽 (게임 규칙상 세기와는 무관한 단순 숫자 순서). */
+const DISPLAY_RANK_ORDER: readonly Rank[] = [
+  "2",
+  "3",
+  "4",
+  "5",
+  "6",
+  "7",
+  "8",
+  "9",
+  "10",
+  "J",
+  "Q",
+  "K",
+  "A",
+];
+
+/**
+ * 손패를 화면에 보여줄 순서로 정렬한다. 랭크가 낮을수록(2가 최저) 왼쪽에
+ * 오고, 같은 랭크면 무늬 순(클로버<다이아<하트<스페이드)으로 나열해 매번
+ * 같은 배치가 나온다.
+ * @param cards - 정렬할 카드들
+ * @returns 정렬된 새 배열 (원본은 바꾸지 않음)
+ */
+export const sortHandForDisplay = (cards: readonly Card[]): Card[] =>
+  [...cards].sort((a, b) => {
+    const rankDiff =
+      DISPLAY_RANK_ORDER.indexOf(a.rank) - DISPLAY_RANK_ORDER.indexOf(b.rank);
+    if (rankDiff !== 0) return rankDiff;
+    return SUIT_STARTING_ORDER[a.suit] - SUIT_STARTING_ORDER[b.suit];
+  });
 
 /**
  * 두 카드의 시작 우선순위를 비교한다. 랭크가 낮을수록(3이 최저)

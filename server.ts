@@ -34,11 +34,27 @@ import {
   publicYatzyGameState,
 } from "@/server/yatzy/gameLogic";
 import {
+  applyPendingRefill,
+  burnPile,
+  commitFaceDownPickup,
+  commitFaceDownPlay,
+  commitFaceDownToHand,
+  finalizeGameOver,
   pickUpPile,
-  playFromFaceDown,
   playFromHandOrFaceUp,
+  revealFaceDown,
   selectFaceUpCards,
+  type PlayResult,
 } from "@/server/shithead/gameLogic";
+import {
+  BURN_HOLD_MS,
+  CARD_FLIGHT_DURATION_MS,
+  FACE_DOWN_FLIP_MS,
+  FACE_DOWN_HOLD_MS,
+  GAME_OVER_HOLD_MS,
+  HAND_SHIFT_MS,
+} from "@/constants/shithead";
+import { cardsFlightMs } from "@/utils/shithead";
 
 interface SocketData {
   userId: string;
@@ -122,6 +138,59 @@ app.prepare().then(() => {
       where: { code: room.code },
       data: { status: "FINISHED", finishedAt: new Date() },
     });
+  };
+
+  /**
+   * 손패/얼굴카드에서 카드를 낸(또는 바닥패를 뒤집어 낸) 뒤 공통으로 해야
+   * 하는 뒷일을 예약한다. 손패/더미 갱신은 항상 바로 알린다 — 늦추면 낸
+   * 카드가 손패에 남아있다가 갑자기 사라지는 것처럼 보인다. 게임이
+   * 끝났으면 결과 화면 전환만 카드가 다 도착할 때까지 따로 미루고, 아니면
+   * 재정렬이 끝난 뒤 손패를 채우고(필요하면) 카드가 쌓인 모습을 보여준 뒤
+   * 더미를 태운다(필요하면).
+   * @param roomCode - 대상 방 코드
+   * @param room - 대상 방
+   * @param requesterId - 방금 카드를 낸 플레이어
+   * @param result - playFromHandOrFaceUp/commitFaceDownPlay의 결과
+   */
+  const scheduleAfterShitheadPlay = (
+    roomCode: string,
+    room: RoomState,
+    requesterId: string,
+    result: PlayResult,
+  ): void => {
+    void broadcastRoomState(room);
+
+    if (result.gameOver) {
+      const delay = cardsFlightMs(result.played.length) + GAME_OVER_HOLD_MS;
+      setTimeout(() => {
+        void (async (): Promise<void> => {
+          finalizeGameOver(room);
+          await broadcastRoomState(room);
+          await persistShitheadResults(room);
+        })();
+      }, delay);
+      return;
+    }
+
+    if (result.refilled > 0) {
+      setTimeout(() => {
+        void (async (): Promise<void> => {
+          applyPendingRefill(room, requesterId);
+          await broadcastRoomState(room);
+        })();
+      }, HAND_SHIFT_MS);
+    }
+
+    if (result.burned) {
+      const delay = cardsFlightMs(result.played.length) + BURN_HOLD_MS;
+      setTimeout(() => {
+        void (async (): Promise<void> => {
+          const burnedCards = burnPile(room);
+          io.to(roomCode).emit("shithead_pile_burned", { cards: burnedCards });
+          await broadcastRoomState(room);
+        })();
+      }, delay);
+    }
   };
 
   const lastPlayerTimers = new Map<string, NodeJS.Timeout>();
@@ -321,6 +390,11 @@ app.prepare().then(() => {
       try {
         assertCanStartGame(room, socket.data.userId);
         startGameData(room);
+        if (room.game.type === "SHITHEAD") {
+          io.to(roomCode).emit("shithead_deal", {
+            playerIds: room.players.map((p) => p.userId),
+          });
+        }
         // 시작 직전에 연결 끊긴 플레이어를 걸러냈으니 DB도 맞춰준다.
         const kept = room.players.map((p) => p.userId);
         await prisma.roomPlayer.deleteMany({
@@ -415,29 +489,78 @@ app.prepare().then(() => {
       }
     });
 
-    socket.on("shithead_play", async ({ cardIds }: { cardIds: string[] }) => {
+    socket.on("shithead_play", ({ cardIds }: { cardIds: string[] }) => {
       if (!roomCode) return;
-      const room = getRoom(roomCode);
+      const code = roomCode;
+      const room = getRoom(code);
       if (!room) return;
 
       try {
         const result = playFromHandOrFaceUp(room, socket.data.userId, cardIds);
-        await broadcastRoomState(room);
-        if (result.gameOver) await persistShitheadResults(room);
+        if (result.played.length > 0) {
+          io.to(code).emit("shithead_play", {
+            playerId: socket.data.userId,
+            cards: result.played,
+            refilled: result.refilled,
+          });
+        }
+        scheduleAfterShitheadPlay(code, room, socket.data.userId, result);
       } catch (err) {
         socket.emit("error_message", (err as Error).message);
       }
     });
 
-    socket.on("shithead_play_face_down", async ({ index }: { index: number }) => {
+    socket.on("shithead_play_face_down", ({ index }: { index: number }) => {
       if (!roomCode) return;
-      const room = getRoom(roomCode);
+      const code = roomCode;
+      const room = getRoom(code);
       if (!room) return;
 
       try {
-        const result = playFromFaceDown(room, socket.data.userId, index);
-        await broadcastRoomState(room);
-        if (result.gameOver) await persistShitheadResults(room);
+        const { card, accepted } = revealFaceDown(room, socket.data.userId, index);
+        // 먼저 뒤집힌 카드만 공개해 클라이언트가 뒤집기+대기 연출을 재생하게
+        // 하고, 실제 게임 상태 반영(더미/손패 갱신)은 연출이 끝난 뒤로 미룬다.
+        io.to(code).emit("shithead_face_down_reveal", {
+          playerId: socket.data.userId,
+          index,
+          card,
+          accepted,
+        });
+
+        setTimeout(() => {
+          void (async (): Promise<void> => {
+            if (accepted) {
+              const result = commitFaceDownPlay(room, socket.data.userId, index);
+              io.to(code).emit("shithead_play", {
+                playerId: socket.data.userId,
+                cards: result.played,
+                refilled: result.refilled,
+              });
+              scheduleAfterShitheadPlay(code, room, socket.data.userId, result);
+              return;
+            }
+
+            // 낼 수 없는 카드 — 뒤집힌 카드부터 손패로 옮기는 모습을 먼저
+            // 보여주고, 그 애니메이션이 끝난 뒤 더미 전체를 마저 가져온다.
+            commitFaceDownToHand(room, socket.data.userId, index);
+            io.to(code).emit("shithead_face_down_to_hand", {
+              playerId: socket.data.userId,
+              index,
+            });
+            await broadcastRoomState(room);
+
+            setTimeout(() => {
+              void (async (): Promise<void> => {
+                const pickedUp = commitFaceDownPickup(room, socket.data.userId);
+                io.to(code).emit("shithead_pickup", {
+                  playerId: socket.data.userId,
+                  count: pickedUp,
+                });
+                await broadcastRoomState(room);
+              })();
+            }, CARD_FLIGHT_DURATION_MS);
+          })();
+        }, FACE_DOWN_FLIP_MS + FACE_DOWN_HOLD_MS);
       } catch (err) {
         socket.emit("error_message", (err as Error).message);
       }
@@ -449,7 +572,11 @@ app.prepare().then(() => {
       if (!room) return;
 
       try {
-        pickUpPile(room, socket.data.userId);
+        const taken = pickUpPile(room, socket.data.userId);
+        io.to(roomCode).emit("shithead_pickup", {
+          playerId: socket.data.userId,
+          count: taken,
+        });
         await broadcastRoomState(room);
       } catch (err) {
         socket.emit("error_message", (err as Error).message);

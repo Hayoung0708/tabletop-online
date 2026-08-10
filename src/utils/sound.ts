@@ -24,6 +24,24 @@ export const playSound = (src: string): void => {
   new Audio(src).play().catch(() => {});
 };
 
+/** 같은 소리가 이 시간(ms) 안에 또 요청되면 무시한다. 카드 이동 간격(최소 170ms)보다 짧게 잡는다. */
+const SOUND_DEDUPE_MS = 80;
+
+/** 소리별 마지막 재생 시각(ms). */
+const lastPlayedAt = new Map<string, number>();
+
+/**
+ * 같은 소리가 거의 동시에 여러 번 요청돼도 한 번만 재생한다. 여러 사람에게
+ * 카드가 동시에 뿌려질 때처럼, 같은 순간의 소리가 겹쳐 커지는 걸 막는다.
+ * @param src - 재생할 오디오 파일 경로
+ */
+export const playSoundOnce = (src: string): void => {
+  const now = Date.now();
+  if (now - (lastPlayedAt.get(src) ?? 0) < SOUND_DEDUPE_MS) return;
+  lastPlayedAt.set(src, now);
+  playSound(src);
+};
+
 /**
  * 오디오 소스 하나 또는 후보 목록을 받아 재생한다. 목록이면 무작위로 하나 고른다.
  * @param src - 오디오 파일 경로 또는 후보 목록
