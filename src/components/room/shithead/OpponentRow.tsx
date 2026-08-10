@@ -7,8 +7,9 @@ import { FaceCardSlots } from "@/components/room/shithead/FaceCardSlots";
 import { useDealing } from "@/components/room/shithead/DealingContext";
 import { useHandDealIn } from "@/hooks/shithead/useHandDealIn";
 import { useHandGrowIn } from "@/hooks/shithead/useHandGrowIn";
+import { useMeasuredWidth } from "@/hooks/useMeasuredWidth";
 import { SHITHEAD_ANCHOR } from "@/constants/shithead";
-import { cardsFlightMs } from "@/utils/shithead";
+import { cardsFlightMs, computeHandMargin } from "@/utils/shithead";
 import type { PublicShitheadPlayer } from "@/server/shithead/gameLogic";
 
 export interface OpponentRowProps {
@@ -37,6 +38,9 @@ export const OpponentRow = ({
 }: OpponentRowProps): JSX.Element => {
   const dealing = useDealing();
   const handRef = useRef<HTMLDivElement>(null);
+  // 손패 영역의 실제 폭을 재서, 카드가 많아지면 내 손패(CardFan)처럼 겹침을
+  // 더 강하게 줘 필드 밖으로 넘치지 않게 한다.
+  const [, handWidth] = useMeasuredWidth(handRef);
   // 상대 손패도 내 손패와 똑같이, 딜 시작에 맞춰 덱에서 직접 날아들며 밀린다.
   const flying = useHandDealIn(handRef, true);
   const hidden = dealing && !flying;
@@ -101,6 +105,7 @@ export const OpponentRow = ({
     ...Array.from({ length: visibleCount }, (_, i) => String(visibleCount - i)),
   ];
   useHandGrowIn(handRef, handKeys, player.userId, !dealing);
+  const handMarginPx = computeHandMargin(handKeys.length, handWidth);
 
   return (
     <div
@@ -132,7 +137,7 @@ export const OpponentRow = ({
 
       <div
         data-anchor={SHITHEAD_ANCHOR.field(player.userId)}
-        className="flex items-start gap-6"
+        className="flex w-full items-start gap-6"
       >
         <FaceCardSlots
           faceUp={player.faceUp}
@@ -140,19 +145,23 @@ export const OpponentRow = ({
           anchorUserId={player.userId}
         />
         {/* z-50: 비행 오버레이(z-40)보다 위 — 손패에서 나가는 카드가 남은
-            카드들 아래에 깔린 채 더미로 이동해야 자연스럽다. */}
+            카드들 아래에 깔린 채 더미로 이동해야 자연스럽다.
+            min-w-0 flex-1: 내 손패(CardFan)와 똑같이 남은 공간만큼만 차지하게
+            해서 폭을 측정할 수 있게 한다 — 이게 없으면 카드 실제 폭만큼
+            계속 늘어나 필드 밖으로 넘친다. */}
         <div
           ref={handRef}
           data-anchor={SHITHEAD_ANCHOR.hand(player.userId)}
           data-hand-align="start"
-          className={`relative z-50 flex min-h-[5.625rem] min-w-14 -space-x-9 sm:min-h-[6.625rem] sm:min-w-16 ${
+          className={`relative z-50 flex min-h-[5.625rem] min-w-0 flex-1 sm:min-h-[6.625rem] ${
             hidden ? "invisible" : ""
           }`}
         >
-          {handKeys.map((key) => (
+          {handKeys.map((key, index) => (
             <div
               key={key}
               className={`relative ${key.startsWith("gone-") ? "invisible" : ""}`}
+              style={{ marginLeft: index === 0 ? 0 : handMarginPx }}
             >
               <PlayingCard faceDown />
             </div>
