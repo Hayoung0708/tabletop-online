@@ -1,11 +1,11 @@
 "use client";
 
-import { useState, type JSX } from "react";
+import { useMemo, useState, type JSX } from "react";
 import { PlayingCard } from "@/components/room/shithead/PlayingCard";
 import { FaceCardSlots } from "@/components/room/shithead/FaceCardSlots";
 import { CardFan } from "@/components/room/shithead/CardFan";
 import { SHITHEAD_ANCHOR } from "@/constants/shithead";
-import { canPlaySingleCard } from "@/server/shithead/deck";
+import { canPlaySingleCard, sortHandForDisplay } from "@/server/shithead/deck";
 import type { Card } from "@/server/shithead/deck";
 
 export interface MyZonesProps {
@@ -49,7 +49,13 @@ export const MyZones = ({
 }: MyZonesProps): JSX.Element => {
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
 
-  const activeZone: Card[] = hand.length > 0 ? hand : faceUp;
+  // 내 턴이 끝날 때마다(카드를 내거나 주워서 손패가 바뀔 때마다) 항상 낮은
+  // 숫자(2)가 왼쪽, 높은 숫자(A)가 오른쪽에 오도록 정렬한다. 카드 id는 그대로
+  // 유지되므로 CardFan의 FLIP 애니메이션(useHandGrowIn)이 알아서 자리가
+  // 바뀐 카드를 부드럽게 이동시켜 보여준다.
+  const sortedHand = useMemo(() => sortHandForDisplay(hand), [hand]);
+
+  const activeZone: Card[] = sortedHand.length > 0 ? sortedHand : faceUp;
   const isBlindPhase = hand.length === 0 && faceUp.length === 0;
   /**
    * 지금 이 카드를 더미 위에 낼 수 있는지 확인한다.
@@ -106,8 +112,8 @@ export const MyZones = ({
               마운트하면 훅이 매번 새로 시작해 "0장→첫 카드" 전환에서 비교할
               이전 위치가 없어, 바닥패를 뒤집어 손패로 들어오는 첫 카드가
               날아오지 않고 그냥 나타나 보인다. */}
-          <CardFan cardKeys={hand.map((c) => c.id)} playerId={userId}>
-            {hand.map((card) => (
+          <CardFan cardKeys={sortedHand.map((c) => c.id)} playerId={userId}>
+            {sortedHand.map((card) => (
               <PlayingCard
                 key={card.id}
                 card={card}
