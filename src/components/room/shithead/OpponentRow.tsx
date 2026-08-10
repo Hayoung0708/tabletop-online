@@ -57,11 +57,18 @@ export const OpponentRow = ({
   // 착지 신호(또는 예비 타임아웃) 전까지 그 사이 변동은 전부 무시하고,
   // 풀리는 순간의 최신 실제 값으로 한 번에 맞춘다.
   const [lastSeenCount, setLastSeenCount] = useState(player.handCount);
+  const [lastSelectionDone, setLastSelectionDone] = useState(player.selectionDone);
   const [frozen, setFrozen] = useState<{ count: number; hidden: number } | null>(null);
+  // 바닥패를 막 고른 순간의 6장→3장 감소는 카드를 낸 게 아니므로 얼리지 않는다.
+  // 전원이 다 골랐는지(allSelected)로 판단하면 안 된다 — 마지막으로 고른
+  // 사람은 고르는 그 순간 allSelected가 같이 true가 돼버려서 판단이 뒤집힌다.
+  const justSelected = player.selectionDone && !lastSelectionDone;
+  if (player.selectionDone !== lastSelectionDone) {
+    setLastSelectionDone(player.selectionDone);
+  }
   if (player.handCount !== lastSeenCount) {
     const played = lastSeenCount - player.handCount;
-    // 선택 단계의 6장→3장 감소는 카드를 낸 게 아니므로 얼리지 않는다.
-    if (frozen === null && played >= 2 && !showSelectionStatus) {
+    if (frozen === null && played >= 2 && !justSelected) {
       setFrozen({ count: lastSeenCount, hidden: played });
     }
     setLastSeenCount(player.handCount);
