@@ -52,6 +52,21 @@ export const ShitheadGameBoard = ({
 
   const isMyTurn = game.currentPlayerId === userId;
 
+  // 상대는 턴 순서(나 다음 차례부터)대로 나열한다 — players 배열이 곧 턴
+  // 순서이므로 내 위치 기준으로 회전시키면 된다.
+  const myIndex = game.players.findIndex((p) => p.userId === userId);
+  const opponents = [
+    ...game.players.slice(myIndex + 1),
+    ...game.players.slice(0, myIndex),
+  ];
+  // 최대 두 줄로 배치해 메인 영역에 세로 스크롤이 생기지 않게 한다.
+  // 1~2명: 한 줄에 한 명씩 / 3명: 첫 줄 1명 + 둘째 줄 2명 / 4명: 2명 + 2명.
+  const firstRowCount = opponents.length <= 2 ? 1 : Math.floor(opponents.length / 2);
+  const opponentRows = [
+    opponents.slice(0, firstRowCount),
+    opponents.slice(firstRowCount),
+  ].filter((row) => row.length > 0);
+
   return (
     <>
       <StarterAnnounceToast announce={starterAnnounce} />
@@ -59,17 +74,20 @@ export const ShitheadGameBoard = ({
       {state.status === "PLAYING" && (
         <>
           <div className="flex flex-col gap-2">
-            {game.players
-              .filter((p) => p.userId !== userId)
-              .map((p) => (
-                <OpponentRow
-                  key={p.userId}
-                  nickname={nicknameOf(p.userId)}
-                  player={p}
-                  isCurrentTurn={game.currentPlayerId === p.userId}
-                  showSelectionStatus={!allSelected}
-                />
-              ))}
+            {opponentRows.map((row) => (
+              <div key={row[0].userId} className="flex gap-2">
+                {row.map((p) => (
+                  <div key={p.userId} className="min-w-0 flex-1">
+                    <OpponentRow
+                      nickname={nicknameOf(p.userId)}
+                      player={p}
+                      isCurrentTurn={game.currentPlayerId === p.userId}
+                      showSelectionStatus={!allSelected}
+                    />
+                  </div>
+                ))}
+              </div>
+            ))}
           </div>
 
           <PileAndDeck pile={game.pile} deckCount={game.deckCount} />

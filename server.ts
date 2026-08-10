@@ -53,6 +53,7 @@ import {
   FACE_DOWN_HOLD_MS,
   GAME_OVER_HOLD_MS,
   HAND_SHIFT_MS,
+  SHITHEAD_MAX_PLAYERS,
 } from "@/constants/shithead";
 import { cardsFlightMs } from "@/utils/shithead";
 
@@ -388,7 +389,11 @@ app.prepare().then(() => {
       if (!room) return;
 
       try {
-        assertCanStartGame(room, socket.data.userId);
+        assertCanStartGame(
+          room,
+          socket.data.userId,
+          room.game.type === "SHITHEAD" ? SHITHEAD_MAX_PLAYERS : undefined,
+        );
         startGameData(room);
         if (room.game.type === "SHITHEAD") {
           io.to(roomCode).emit("shithead_deal", {

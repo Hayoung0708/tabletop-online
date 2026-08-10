@@ -182,8 +182,13 @@ export const removeDisconnectedPlayers = (room: RoomState): string[] => {
  * startXGame이 뒤이어 처리한다.
  * @param room - 대상 방
  * @param requesterId - 시작을 요청한 게스트 id
+ * @param maxStartPlayers
  */
-export const assertCanStartGame = (room: RoomState, requesterId: string): void => {
+export const assertCanStartGame = (
+  room: RoomState,
+  requesterId: string,
+  maxStartPlayers?: number,
+): void => {
   if (room.hostId !== requesterId) throw new Error("호스트만 시작할 수 있습니다.");
   // 게임이 끝난 뒤(FINISHED)에는 대기 화면과 같은 카드에서 곧바로 다시
   // 시작할 수 있어야 하므로, 진행 중(PLAYING)일 때만 막는다.
@@ -193,6 +198,9 @@ export const assertCanStartGame = (room: RoomState, requesterId: string): void =
   removeDisconnectedPlayers(room);
   if (room.players.length < MIN_PLAYERS_TO_START)
     throw new Error("최소 2명이 필요합니다.");
+  // 게임별 시작 인원 상한(예: 싯헤드는 덱 한계로 5명). 방 정원과는 별개다.
+  if (maxStartPlayers !== undefined && room.players.length > maxStartPlayers)
+    throw new Error(`이 게임은 최대 ${maxStartPlayers}명까지 시작할 수 있습니다.`);
 
   room.status = "PLAYING";
 };
