@@ -39,6 +39,16 @@ export const FACE_DOWN_HOLD_MS = 1000;
 /** 게임이 끝나는 마지막 패를 낸 뒤, 결과 화면으로 넘어가기 전 잠깐 멈추는 시간(ms). */
 export const GAME_OVER_HOLD_MS = 1000;
 
+/** 카드 내는 소리를 착지 시각보다 먼저 재생하는 리드 타임(ms) — 착지 순간에 맞춰 들리게 보정. */
+export const PLACE_SOUND_LEAD_MS = 180;
+
+/**
+ * 손패 보충(리필) 소리를 비행 시작보다 늦게 재생하는 지연(ms). 리필 비행은
+ * 낸 카드가 착지하기 전(HAND_SHIFT_MS)에 시작하므로, 그대로 틀면 착지 소리와
+ * 겹친다 — 착지(비행 600ms) 직후로 밀어서 "탁(착지) → 슥(보충)"으로 분리한다.
+ */
+export const REFILL_SOUND_DELAY_MS = 300;
+
 /** 더미가 다 쌓인 모습을 보여준 채로 유지하는 시간(ms) — 이 시간이 지나야 태운다. */
 export const BURN_HOLD_MS = 250;
 

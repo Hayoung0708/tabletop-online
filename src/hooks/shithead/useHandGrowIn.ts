@@ -1,7 +1,17 @@
 "use client";
 
 import { useLayoutEffect, useRef, type RefObject } from "react";
-import { CARD_FLIGHT_DURATION_MS, HAND_SHIFT_MS } from "@/constants/shithead";
+import {
+  CARD_FLIGHT_DURATION_MS,
+  HAND_SHIFT_MS,
+  REFILL_SOUND_DELAY_MS,
+  SHITHEAD_ANCHOR,
+} from "@/constants/shithead";
+import {
+  CARD_TAKE_FROM_DECK_SOUND_SRC,
+  CARD_TAKE_FROM_PILE_SOUND_SRC,
+} from "@/constants/media";
+import { playSoundOnce } from "@/utils/sound";
 import { getHandGrowSource } from "@/hooks/shithead/handGrowSource";
 
 /** 카드 이동에 쓰는 공통 이징 — 빠르게 나갔다가 부드럽게 안착한다. */
@@ -54,10 +64,12 @@ export const useHandGrowIn = (
     // 위치가 안 변했으면(dx가 0에 가까우면) 아래 루프에서 알아서 건너뛴다.
     if (!enabled) return;
 
-    const sourceEl = document.querySelector(
-      `[data-anchor="${getHandGrowSource(playerId)}"]`,
-    );
+    const sourceAnchor = getHandGrowSource(playerId);
+    const sourceEl = document.querySelector(`[data-anchor="${sourceAnchor}"]`);
     const sourceRect = sourceEl?.getBoundingClientRect();
+    // 새 카드들은 한꺼번에 같은 곳에서 출발하므로 소리도 한 번만 낸다.
+    // 더미를 통째로 주웠는지, 덱에서 보충받았는지에 따라 소리가 다르다.
+    let tookNewCards = false;
 
     wrappers.forEach((wrapper, index) => {
       const key = keys[index];
@@ -77,7 +89,9 @@ export const useHandGrowIn = (
       }
 
       if (!sourceRect || sourceRect.height === 0) return;
-      // 새로 들어온 카드 — 덱(또는 더미)에서 제자리로 날아온다.
+      // 새로 들어온 카드 — 덱(또는 더미)에서 제자리로 날아온다. 숨김 자리
+      // (상대 다장 플레이의 gone-* 자리)는 화면에 안 보이므로 소리도 내면 안 된다.
+      if (!wrapper.classList.contains("invisible")) tookNewCards = true;
       const rect = wrapper.getBoundingClientRect();
       const dx = sourceRect.left + sourceRect.width / 2 - (rect.left + rect.width / 2);
       const dy = sourceRect.top + sourceRect.height / 2 - (rect.top + rect.height / 2);
@@ -90,5 +104,17 @@ export const useHandGrowIn = (
         { duration: CARD_FLIGHT_DURATION_MS, easing: EASING, fill: "backwards" },
       );
     });
+
+    if (tookNewCards) {
+      if (sourceAnchor === SHITHEAD_ANCHOR.pile) {
+        playSoundOnce(CARD_TAKE_FROM_PILE_SOUND_SRC);
+      } else {
+        // 보충은 직전 착지 소리와 붙어 들리지 않게 조금 늦춰 재생한다.
+        setTimeout(
+          () => playSoundOnce(CARD_TAKE_FROM_DECK_SOUND_SRC),
+          REFILL_SOUND_DELAY_MS,
+        );
+      }
+    }
   }, [containerRef, keys, playerId, enabled]);
 };

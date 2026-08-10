@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useRef, useState, type RefObject } from "react";
+import { playSoundOnce } from "@/utils/sound";
+import { CARD_TAKE_FROM_DECK_SOUND_SRC } from "@/constants/media";
 import {
   CARD_FLIGHT_DURATION_MS,
   HAND_DEAL_INTRA_MS,
@@ -59,6 +61,13 @@ export const useHandDealIn = (
           const dyDeck =
             deckRect.top + deckRect.height / 2 - (rect.top + rect.height / 2);
           const dxLeft = leftX - rect.left;
+
+          // 이 카드가 덱에서 출발하는 순간의 소리. 같은 순번 카드는 모든
+          // 플레이어에게 동시에 날아가므로 playSoundOnce가 한 번으로 묶는다.
+          setTimeout(
+            () => playSoundOnce(CARD_TAKE_FROM_DECK_SOUND_SRC),
+            arrival * HAND_DEAL_INTRA_MS,
+          );
 
           wrapper.animate(
             [

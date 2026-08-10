@@ -3,6 +3,13 @@ export const YAHTZEE_ANIMATION_SRC = "/lottie/yahtzee-success.json";
 /** 야찌 성공 효과음 */
 export const YAHTZEE_SOUND_SRC = "/sounds/yahtzee-success.mp3";
 
+/** 덱에서 카드를 뽑을 때 나는 소리 (첫 딜, 손패 보충) */
+export const CARD_TAKE_FROM_DECK_SOUND_SRC = "/sounds/shithead/take-from-deck.mp3";
+/** 더미를 통째로 주워올 때 나는 소리 */
+export const CARD_TAKE_FROM_PILE_SOUND_SRC = "/sounds/shithead/take-from-pile.mp3";
+/** 카드를 더미에 내려놓을 때 나는 소리 */
+export const CARD_PLACE_SOUND_SRC = "/sounds/shithead/place-card.mp3";
+
 /** 준비된 주사위 굴리는 소리 개수 */
 export const DICE_SOUND_COUNT = 13;
 

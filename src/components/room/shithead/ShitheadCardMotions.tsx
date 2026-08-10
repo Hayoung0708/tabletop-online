@@ -4,11 +4,14 @@ import { useEffect, useRef, useState, type JSX } from "react";
 import { getSocket } from "@/lib/socket";
 import { PlayingCard } from "@/components/room/shithead/PlayingCard";
 import { setHandGrowSource } from "@/hooks/shithead/handGrowSource";
+import { playSoundOnce } from "@/utils/sound";
+import { CARD_PLACE_SOUND_SRC, CARD_TAKE_FROM_DECK_SOUND_SRC } from "@/constants/media";
 import {
   CARD_FLIGHT_DURATION_MS,
   CARD_FLIGHT_STAGGER_MS,
   FACE_DOWN_DEAL_SLOTS,
   FACE_DOWN_SLOT_TOP_PX,
+  PLACE_SOUND_LEAD_MS,
   SHITHEAD_DEAL_TOTAL_MS,
   SHITHEAD_ANCHOR,
 } from "@/constants/shithead";
@@ -343,6 +346,14 @@ export const ShitheadCardMotions = (): JSX.Element => {
         };
       });
       setFlights((prev) => [...prev, ...next]);
+      // 내려놓는 소리는 착지보다 리드 타임만큼 먼저 틀어야 귀에는 착지 순간과
+      // 맞게 들린다. 여러 장이면 스태거 간격대로 장수만큼 울린다.
+      cards.forEach((_, i) => {
+        setTimeout(
+          () => playSoundOnce(CARD_PLACE_SOUND_SRC),
+          i * CARD_FLIGHT_STAGGER_MS + CARD_FLIGHT_DURATION_MS - PLACE_SOUND_LEAD_MS,
+        );
+      });
     };
 
     /**
@@ -401,6 +412,12 @@ export const ShitheadCardMotions = (): JSX.Element => {
       // 내/상대 모두 실제 카드가 덱에서 직접 날아드는 연출(useHandDealIn)이라
       // 오버레이로는 날리지 않는다.
       for (let slot = 0; slot < FACE_DOWN_DEAL_SLOTS; slot += 1) {
+        // 자리마다 카드가 덱에서 출발하는 순간에 소리를 낸다. 같은 자리 카드는
+        // 모든 플레이어에게 동시에 날아가므로 playSoundOnce가 한 번으로 묶는다.
+        setTimeout(
+          () => playSoundOnce(CARD_TAKE_FROM_DECK_SOUND_SRC),
+          slot * CARD_FLIGHT_STAGGER_MS,
+        );
         for (const playerId of playerIds) {
           const to = slotLanding(playerId, slot);
           if (!to) continue;
