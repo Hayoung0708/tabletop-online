@@ -48,7 +48,11 @@ export const FaceUpSelection = ({
   return (
     <div className="flex flex-col items-start gap-3 rounded-xl border border-slate-800 bg-slate-900/40 px-3 pt-3 pb-4">
       <div className="flex w-full items-end gap-6">
-        <FaceCardSlots faceUp={[]} faceDownCount={FACE_DOWN_SIZE} anchorUserId={userId} />
+        <FaceCardSlots
+          faceUp={[]}
+          faceDown={Array<boolean>(FACE_DOWN_SIZE).fill(true)}
+          anchorUserId={userId}
+        />
         <div
           data-anchor={SHITHEAD_ANCHOR.hand(userId)}
           data-hand-align="end"

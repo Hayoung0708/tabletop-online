@@ -1,8 +1,10 @@
 "use client";
 
-import { useEffect, useState, type JSX } from "react";
+import { useEffect, useRef, useState, type JSX } from "react";
+import { getSocket } from "@/lib/socket";
 import { PlayingCard } from "@/components/room/shithead/PlayingCard";
 import {
+  BURN_VANISH_MS,
   CARD_FLIGHT_DURATION_MS,
   CARD_FLIGHT_STAGGER_MS,
   SHITHEAD_ANCHOR,
@@ -59,6 +61,29 @@ export const PileAndDeck = ({ pile, deckCount }: PileAndDeckProps): JSX.Element 
   const visibleLen = pile.length - heldCount;
   const topCard = pile[visibleLen - 1];
 
+  // 더미가 타서 사라질 때: 서버가 실제로 비우기 직전에 지금 보이는 맨 위
+  // 카드를 붙잡아 두고, 사라지는 연출이 끝나야 놓아준다 — 그래야 쌓인
+  // 모습을 보여준 뒤 없어지는 순서가 지켜지고, 갑자기 빈 자리로 바뀌지 않는다.
+  const [burningCard, setBurningCard] = useState<Card | null>(null);
+
+  useEffect(() => {
+    const socket = getSocket();
+    /** 서버가 더미를 태우기 직전에 알려주면, 지금 보이는 카드를 붙잡아 둔다. */
+    const onBurned = (): void => {
+      if (topCard) setBurningCard(topCard);
+    };
+    socket.on("shithead_pile_burned", onBurned);
+    return (): void => {
+      socket.off("shithead_pile_burned", onBurned);
+    };
+  }, [topCard]);
+
+  useEffect(() => {
+    if (!burningCard) return;
+    const timer = setTimeout(() => setBurningCard(null), BURN_VANISH_MS);
+    return (): void => clearTimeout(timer);
+  }, [burningCard]);
+
   return (
     <div className="flex items-start justify-center gap-6 py-4">
       <div className="flex flex-col items-center gap-1.5">
@@ -72,17 +97,63 @@ export const PileAndDeck = ({ pile, deckCount }: PileAndDeckProps): JSX.Element 
         <span className="text-sm text-slate-400">덱 {deckCount}장</span>
       </div>
       <div className="flex flex-col items-center gap-1.5">
-        <div data-anchor={SHITHEAD_ANCHOR.pile}>
-          {topCard ? (
-            // key로 카드가 바뀔 때 엘리먼트를 새로 만든다 — 같은 노드를 재사용하면
-            // 남아 있던 스타일이 전이되며 색이 한 번 반짝일 수 있다.
-            <PlayingCard key={topCard.id} card={topCard} />
-          ) : (
-            <div className={EMPTY_SLOT_CLASS} />
+        <div
+          data-anchor={SHITHEAD_ANCHOR.pile}
+          className="relative h-20 w-14 sm:h-24 sm:w-16"
+        >
+          {/* 점선 빈 자리는 항상 밑에 깔아 둔다 — 카드가 있으면 완전히
+              가려지고, 태워 사라질 때는 카드만 애니메이션되며 자리는
+              그대로 남아 있어 "카드만 사라지는" 모습이 된다. */}
+          <div className={EMPTY_SLOT_CLASS} />
+          {burningCard && (
+            <div className="absolute inset-0">
+              <BurningPileCard card={burningCard} />
+            </div>
+          )}
+          {!burningCard && topCard && (
+            <div className="absolute inset-0">
+              {/* key로 카드가 바뀔 때 엘리먼트를 새로 만든다 — 같은 노드를
+                  재사용하면 남아 있던 스타일이 전이되며 색이 한 번 반짝일 수 있다. */}
+              <PlayingCard key={topCard.id} card={topCard} />
+            </div>
           )}
         </div>
         <span className="text-sm text-slate-400">더미 {visibleLen}장</span>
       </div>
+    </div>
+  );
+};
+
+export interface BurningPileCardProps {
+  card: Card;
+}
+
+/**
+ * 더미가 타서 사라지는 연출. 마운트되는 순간 살짝 커졌다가 회전하며
+ * 줄어들어 사라진다.
+ * @param props - 사라질 카드
+ * @param props.card
+ * @returns 사라지는 카드 엘리먼트
+ */
+const BurningPileCard = ({ card }: BurningPileCardProps): JSX.Element => {
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    el.animate(
+      [
+        { transform: "scale(1) rotate(0deg)", opacity: 1 },
+        { transform: "scale(1.08) rotate(0deg)", opacity: 1, offset: 0.2 },
+        { transform: "scale(0.4) rotate(18deg)", opacity: 0 },
+      ],
+      { duration: BURN_VANISH_MS, easing: "ease-in", fill: "forwards" },
+    );
+  }, []);
+
+  return (
+    <div ref={ref}>
+      <PlayingCard card={card} />
     </div>
   );
 };

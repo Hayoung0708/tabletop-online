@@ -1,7 +1,21 @@
-import { HAND_CARD_GAP_PX, HAND_CARD_WIDTH_PX } from "@/constants/shithead";
+import {
+  CARD_FLIGHT_DURATION_MS,
+  CARD_FLIGHT_STAGGER_MS,
+  HAND_CARD_GAP_PX,
+  HAND_CARD_WIDTH_PX,
+} from "@/constants/shithead";
 
 /** hover한 카드에서 최소로 보여야 하는 비율(3/4). 이보다 더 가려지면 오른쪽 카드를 밀어 드러낸다. */
 const REVEAL_RATIO = 0.75;
+
+/**
+ * 카드 여러 장이 연속으로(스태거) 날아가는 비행이 전부 끝나는 데 걸리는
+ * 시간(ms). 마지막 카드가 출발하는 시점(스태거 누적) + 한 장의 비행 시간.
+ * @param count - 함께 날아가는 카드 수
+ * @returns 전체 비행이 끝나는 데 걸리는 시간(ms)
+ */
+export const cardsFlightMs = (count: number): number =>
+  CARD_FLIGHT_DURATION_MS + Math.max(0, count - 1) * CARD_FLIGHT_STAGGER_MS;
 
 /**
  * 쉬는 상태의 카드 간격(px)을 구한다. 영역 폭 안에서 최대한 펼치고, 다 안 들어가면

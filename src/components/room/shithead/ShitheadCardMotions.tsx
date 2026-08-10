@@ -40,6 +40,12 @@ interface Flight {
    * 이미 화면에 있던 카드가 이동하는 낼때는 false — 반투명이면 아래 카드가 비친다.
    */
   fadeIn: boolean;
+  /**
+   * true면 날아가는 도중에 뒷면→앞면으로 반 바퀴(180도) 돈다. 상대방 손패처럼
+   * 실제로 어느 카드인지 알 수 없어 특정 카드 위치를 못 찾을 때, 손패 맨 왼쪽
+   * 자리에서 뒤집으며 내는 연출에 쓴다.
+   */
+  flipInFlight?: boolean;
 }
 
 let flightIdSeq = 0;
@@ -120,10 +126,36 @@ const handLanding = (playerId: string): Anchor | null => {
   };
 };
 
+/**
+ * 상대 손패의 실제 i번째(왼쪽부터) 카드 래퍼의 현재 화면 중심을 구한다.
+ * 상대 카드는 전부 뒷면이라 카드 id로 찾을 수 없지만, 여러 장을 한 번에
+ * 낼 때 어느 카드들이 나가는지는 정해져 있다 — 항상 왼쪽 카드부터다(새로
+ * 들어오는 카드가 왼쪽에 꽂히는 규칙의 반대). 그래서 인덱스로 실제 DOM
+ * 위치를 읽으면, 손패 전체를 한 점(handLanding)에서 뭉쳐 날리는 대신 낸
+ * 장수만큼 각자 제자리에서 출발하는 것처럼 보인다.
+ * @param playerId - 플레이어 게스트 id
+ * @param index - 왼쪽부터 몇 번째 카드인지(0부터)
+ * @returns 카드 중심, 없으면 null
+ */
+const handWrapperFrom = (playerId: string, index: number): Anchor | null => {
+  const handEl = document.querySelector(
+    `[data-anchor="${SHITHEAD_ANCHOR.hand(playerId)}"]`,
+  );
+  const wrapper = handEl ? Array.from(handEl.children)[index] : undefined;
+  if (!wrapper) return null;
+  const rect = wrapper.getBoundingClientRect();
+  if (rect.width === 0 || rect.height === 0) return null;
+  return { cx: rect.left + rect.width / 2, cy: rect.top + rect.height / 2 };
+};
+
 export interface FlyingCardProps {
   flight: Flight;
   onFinished: (flight: Flight) => void;
 }
+
+// 뒤집기가 비행 시간 중 차지하는 비율. 이동이 강한 감속이라 도착은 앞부분에서
+// 대부분 끝나므로, 회전도 앞쪽 구간 안에 마쳐야 "가는 동안 뒤집힌다"고 보인다.
+const FLIP_SPIN_PORTION = 0.75;
 
 /**
  * 한 장의 카드가 출발점에서 도착점으로 날아가는 애니메이션. 카드 크기는
@@ -135,46 +167,93 @@ export interface FlyingCardProps {
  */
 const FlyingCard = ({ flight, onFinished }: FlyingCardProps): JSX.Element => {
   const ref = useRef<HTMLDivElement>(null);
-  const { from, to, card, delayMs, tiltDeg, fadeIn } = flight;
+  const spinRef = useRef<HTMLDivElement>(null);
+  const { from, to, card, delayMs, tiltDeg, fadeIn, flipInFlight } = flight;
+  // 완료 콜백은 부모가 렌더할 때마다 새로 만들어지므로 의존성에 넣으면 안 된다 —
+  // 넣으면 방 상태가 갱신될 때마다(카드 보충 등) 이펙트가 다시 돌아 비행이
+  // 취소·재시작되고, 같은 카드를 두 번 내는 것처럼 보인다.
+  const onFinishedRef = useRef(onFinished);
+  useEffect(() => {
+    onFinishedRef.current = onFinished;
+  });
 
   useEffect(() => {
     const el = ref.current;
     if (!el) return;
     const dx = to.cx - from.cx;
     const dy = to.cy - from.cy;
-
-    const animation = el.animate(
-      [
-        {
-          transform: `translate(-50%, -50%) rotate(${tiltDeg}deg)`,
-          opacity: fadeIn ? 0 : 1,
-        },
-        { opacity: 1, offset: 0.2 },
-        {
-          transform: `translate(calc(-50% + ${dx}px), calc(-50% + ${dy}px)) rotate(0deg)`,
-          opacity: 1,
-        },
-      ],
+    const keyframes: Keyframe[] = [
       {
-        duration: CARD_FLIGHT_DURATION_MS,
+        transform: `translate(-50%, -50%) rotate(${tiltDeg}deg)`,
+        opacity: fadeIn ? 0 : 1,
+      },
+      { opacity: 1, offset: 0.2 },
+      {
+        transform: `translate(calc(-50% + ${dx}px), calc(-50% + ${dy}px)) rotate(0deg)`,
+        opacity: 1,
+      },
+    ];
+    // 빠르게 튀어나가 부드럽게 안착하는 ease-out. 착지 자세는 fill:both로
+    // 유지되고, 실제 제거 시점은 부모가 정한다.
+    const animation = el.animate(keyframes, {
+      duration: CARD_FLIGHT_DURATION_MS,
+      delay: delayMs,
+      easing: "cubic-bezier(0.22, 1, 0.36, 1)",
+      fill: "both",
+    });
+    animation.onfinish = (): void => onFinishedRef.current(flight);
+
+    // 뒤집기는 이동과 별개의 엘리먼트·별개의 이징으로 돌린다. 이동과 같은 이징을
+    // 쓰면 강한 감속 곡선을 그대로 타서 회전이 초반 100ms 안에 다 끝나버리고,
+    // 카드가 더미에 도착한 뒤 순간적으로 앞면이 되는 것처럼 보인다. 여기서는
+    // 비행 앞쪽 구간에 걸쳐 일정한 속도로 돌려, 날아가는 동안 뒤집히고 도착할
+    // 즈음에는 앞면이 되어 있게 한다.
+    const spinEl = spinRef.current;
+    if (!flipInFlight || !spinEl) return (): void => animation.cancel();
+
+    const spin = spinEl.animate(
+      [{ transform: "rotateY(0deg)" }, { transform: "rotateY(180deg)" }],
+      {
+        duration: CARD_FLIGHT_DURATION_MS * FLIP_SPIN_PORTION,
         delay: delayMs,
-        // 빠르게 튀어나가 부드럽게 안착하는 ease-out.
-        easing: "cubic-bezier(0.22, 1, 0.36, 1)",
+        easing: "linear",
         fill: "both",
       },
     );
-    // 착지 자세는 fill:both로 유지되고, 실제 제거 시점은 부모가 정한다.
-    animation.onfinish = (): void => onFinished(flight);
-    return (): void => animation.cancel();
-  }, [flight, from.cx, from.cy, to.cx, to.cy, delayMs, tiltDeg, fadeIn, onFinished]);
+    return (): void => {
+      animation.cancel();
+      spin.cancel();
+    };
+  }, [flight, from.cx, from.cy, to.cx, to.cy, delayMs, tiltDeg, fadeIn, flipInFlight]);
 
   return (
     <div
       ref={ref}
       className="pointer-events-none absolute"
-      style={{ left: from.cx, top: from.cy }}
+      // perspective는 자식(뒤집히는 래퍼)에 적용되는 속성이라 여기 건다.
+      style={{
+        left: from.cx,
+        top: from.cy,
+        perspective: flipInFlight ? "800px" : undefined,
+      }}
     >
-      <PlayingCard card={card ?? undefined} faceDown={card === null} />
+      {flipInFlight ? (
+        <div ref={spinRef} className="relative" style={{ transformStyle: "preserve-3d" }}>
+          <div style={{ backfaceVisibility: "hidden" }}>
+            <PlayingCard faceDown />
+          </div>
+          {/* 앞면은 미리 180도 돌려 둔다 — 카드가 180도 뒤집힌 순간 정면으로
+              보이고, 좌우가 반전되지도 않는다. */}
+          <div
+            className="absolute inset-0"
+            style={{ backfaceVisibility: "hidden", transform: "rotateY(180deg)" }}
+          >
+            <PlayingCard card={card ?? undefined} />
+          </div>
+        </div>
+      ) : (
+        <PlayingCard card={card ?? undefined} faceDown={card === null} />
+      )}
     </div>
   );
 };
@@ -191,6 +270,8 @@ export const ShitheadCardMotions = (): JSX.Element => {
   // 묶음별 총 장수와 지금까지 착지한 장수 — 마지막 한 장이 착지하는 순간을 안다.
   const groupSizes = useRef<Map<number, number>>(new Map());
   const groupLanded = useRef<Map<number, number>>(new Map());
+  // 묶음이 누구의 패였는지 — 착지 이벤트를 그 플레이어에게만 좁혀 알려줄 때 쓴다.
+  const groupPlayers = useRef<Map<number, string>>(new Map());
 
   useEffect(() => {
     const socket = getSocket();
@@ -237,16 +318,30 @@ export const ShitheadCardMotions = (): JSX.Element => {
       // 카드가 잠깐 사라졌다 나타나며 밑 카드가 비친다).
       const groupId = (groupIdSeq += 1);
       groupSizes.current.set(groupId, cards.length);
-      const next: Flight[] = cards.map((card, i) => ({
-        id: (flightIdSeq += 1),
-        from: cardFrom(card) ?? fallbackFrom,
-        to,
-        card,
-        delayMs: i * CARD_FLIGHT_STAGGER_MS,
-        tiltDeg: 0,
-        groupId,
-        fadeIn: false,
-      }));
+      groupPlayers.current.set(groupId, playerId);
+      const next: Flight[] = cards.map((card, i) => {
+        // 실제 카드 위치를 못 찾았다는 건(상대 손패는 전부 뒷면이라 카드별
+        // id가 없음) 상대 손패에서 낸 카드라는 뜻 — 뒤집으며 날아가는 연출을
+        // 넣는다. 여러 장을 한 번에 냈으면 항상 왼쪽부터 나가므로, 손패
+        // 한 점(fallbackFrom)에 뭉쳐서 출발시키지 않고 i번째 카드의 실제
+        // 자리에서 각자 출발시킨다 — 그래야 "카드가 그 자리에서 이동한다"는
+        // 느낌이 나고, 손패 재정렬(useHandGrowIn)과 자연스럽게 이어진다.
+        // 얼굴카드/내 손패/뒤집은 바닥패는 항상 실제 위치를 찾으므로 여기
+        // 해당하지 않는다.
+        const known = cardFrom(card);
+        const origin = known ?? handWrapperFrom(playerId, i);
+        return {
+          id: (flightIdSeq += 1),
+          from: origin ?? fallbackFrom,
+          to,
+          card,
+          delayMs: i * CARD_FLIGHT_STAGGER_MS,
+          tiltDeg: 0,
+          groupId,
+          fadeIn: false,
+          flipInFlight: !known,
+        };
+      });
       setFlights((prev) => [...prev, ...next]);
     };
 
@@ -258,6 +353,28 @@ export const ShitheadCardMotions = (): JSX.Element => {
      */
     const onPickup = ({ playerId }: { playerId: string }): void => {
       setHandGrowSource(playerId, SHITHEAD_ANCHOR.pile, PICKUP_SOURCE_TTL_MS);
+    };
+
+    /**
+     * 뒷카드를 뒤집었는데 낼 수 없어서, 그 카드 한 장만 먼저 손패로 들어갈 때
+     * 출발 지점을 그 바닥패 자리로 지정한다. 더미 전체는 뒤이어 onPickup이
+     * 처리한다.
+     * @param root0 - 이벤트 페이로드
+     * @param root0.playerId - 카드를 뒤집은 플레이어
+     * @param root0.index - 뒤집었던 바닥패 자리
+     */
+    const onFaceDownToHand = ({
+      playerId,
+      index,
+    }: {
+      playerId: string;
+      index: number;
+    }): void => {
+      setHandGrowSource(
+        playerId,
+        SHITHEAD_ANCHOR.faceDownSlot(playerId, index),
+        PICKUP_SOURCE_TTL_MS,
+      );
     };
 
     /**
@@ -324,10 +441,12 @@ export const ShitheadCardMotions = (): JSX.Element => {
 
     socket.on("shithead_play", onPlay);
     socket.on("shithead_pickup", onPickup);
+    socket.on("shithead_face_down_to_hand", onFaceDownToHand);
     socket.on("shithead_deal", onDeal);
     return (): void => {
       socket.off("shithead_play", onPlay);
       socket.off("shithead_pickup", onPickup);
+      socket.off("shithead_face_down_to_hand", onFaceDownToHand);
       socket.off("shithead_deal", onDeal);
     };
   }, []);
@@ -353,8 +472,19 @@ export const ShitheadCardMotions = (): JSX.Element => {
 
     groupLanded.current.delete(groupId);
     groupSizes.current.delete(groupId);
+    const playerId = groupPlayers.current.get(groupId);
+    groupPlayers.current.delete(groupId);
     setFlights((prev) => prev.filter((f) => f.groupId !== groupId));
     window.dispatchEvent(new CustomEvent("shithead_play_landed"));
+    // 더미 쪽(PileAndDeck)은 누구 카드든 상관없이 반응해도 되지만, 손패
+    // 재정렬(OpponentRow)은 다른 플레이어의 착지에 반응하면 안 되므로
+    // playerId를 담아 따로 알린다 — 안 그러면 내가 카드를 낸 게 먼저
+    // 착지했을 때 상대방의 아직 안 끝난 비행까지 성급하게 풀려버린다.
+    if (playerId) {
+      window.dispatchEvent(
+        new CustomEvent("shithead_hand_landed", { detail: { playerId } }),
+      );
+    }
   };
 
   if (flights.length === 0) return <></>;

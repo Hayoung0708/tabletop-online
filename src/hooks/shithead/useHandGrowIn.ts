@@ -24,6 +24,11 @@ export const useHandGrowIn = (
   enabled: boolean,
 ): void => {
   const prevLefts = useRef<Map<string, number>>(new Map());
+  // "비교 대상이 없는 첫 렌더"인지는 이 플래그로만 판단한다. before.size===0로
+  // 판단하면, 손패가 한 번 0장을 거쳤다가(카드를 전부 낸 직후) 다시 채워질 때도
+  // "첫 렌더"로 오인해 연출을 건너뛴다 — 밀어낼 카드가 없을 뿐 실제로는 첫 렌더가
+  // 아니라서, 그 순간 들어오는 새 카드들이 날아오지 않고 그냥 나타나 보인다.
+  const mounted = useRef(false);
 
   useLayoutEffect(() => {
     const container = containerRef.current;
@@ -40,9 +45,14 @@ export const useHandGrowIn = (
 
     const before = prevLefts.current;
     prevLefts.current = lefts;
-    // 첫 렌더(비교 대상 없음)거나 새로 들어온 카드가 없으면 연출할 게 없다.
-    if (!enabled || before.size === 0) return;
-    if (!keys.some((key) => !before.has(key))) return;
+    if (!mounted.current) {
+      mounted.current = true;
+      return;
+    }
+    // 카드가 줄기만 해도(새로 온 카드 없이) 남은 카드들은 자리를 당겨와야
+    // 하므로, 새 카드 유무와 상관없이 항상 검사한다 — 개별 카드는 실제로
+    // 위치가 안 변했으면(dx가 0에 가까우면) 아래 루프에서 알아서 건너뛴다.
+    if (!enabled) return;
 
     const sourceEl = document.querySelector(
       `[data-anchor="${getHandGrowSource(playerId)}"]`,

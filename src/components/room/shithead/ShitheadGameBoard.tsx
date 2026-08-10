@@ -14,22 +14,21 @@ import type { PublicRoomState } from "@/server/roomManager";
 export interface ShitheadGameBoardProps {
   state: PublicRoomState;
   userId: string;
-  onLeaveRoom: () => void;
 }
 
 /**
  * 싯헤드 게임판: 상대방 카드 상태, 가운데 더미/덱, 내 카드 영역을 조립한다.
  * 딜 직후에는 전원이 바닥패 3장을 고를 때까지 선택 화면을 먼저 보여준다.
- * @param props - 방 상태, 내 게스트 id, 나가기 핸들러
+ * 게임이 끝나면(FINISHED) 등수표만 보여준다 — 재시작은 room 페이지의
+ * 대기 카드(설정/시작)가 맡는다.
+ * @param props - 방 상태, 내 게스트 id
  * @param props.state
  * @param props.userId
- * @param props.onLeaveRoom
  * @returns 싯헤드 게임판 엘리먼트, 싯헤드 방이 아니면 null
  */
 export const ShitheadGameBoard = ({
   state,
   userId,
-  onLeaveRoom,
 }: ShitheadGameBoardProps): JSX.Element | null => {
   const { selectFaceUp, playCards, playFaceDownCard, pickUpPile } = useShitheadActions();
 
@@ -86,7 +85,7 @@ export const ShitheadGameBoard = ({
               userId={userId}
               hand={me.hand ?? []}
               faceUp={me.faceUp}
-              faceDownCount={me.faceDownCount}
+              faceDown={me.faceDown}
               pile={game.pile}
               isMyTurn={isMyTurn}
               onPlayCards={playCards}
@@ -98,11 +97,7 @@ export const ShitheadGameBoard = ({
       )}
 
       {state.status === "FINISHED" && (
-        <ShitheadFinishedPanel
-          players={state.players}
-          shitheadPlayers={game.players}
-          onLeaveRoom={onLeaveRoom}
-        />
+        <ShitheadFinishedPanel players={state.players} shitheadPlayers={game.players} />
       )}
     </>
   );

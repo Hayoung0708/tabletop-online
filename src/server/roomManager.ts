@@ -185,7 +185,9 @@ export const removeDisconnectedPlayers = (room: RoomState): string[] => {
  */
 export const assertCanStartGame = (room: RoomState, requesterId: string): void => {
   if (room.hostId !== requesterId) throw new Error("호스트만 시작할 수 있습니다.");
-  if (room.status !== "WAITING") throw new Error("이미 시작된 게임입니다.");
+  // 게임이 끝난 뒤(FINISHED)에는 대기 화면과 같은 카드에서 곧바로 다시
+  // 시작할 수 있어야 하므로, 진행 중(PLAYING)일 때만 막는다.
+  if (room.status === "PLAYING") throw new Error("이미 시작된 게임입니다.");
   // 연결이 끊긴 채로 남아있는 사람이 인원수를 부풀려 시작 가능한 것처럼
   // 보이면 안 되므로 먼저 정리한다.
   removeDisconnectedPlayers(room);
@@ -210,7 +212,7 @@ export const updateRoomSettings = (
   idleGame: GameData,
 ): void => {
   if (room.hostId !== requesterId) throw new Error("호스트만 변경할 수 있습니다.");
-  if (room.status !== "WAITING") throw new Error("게임 중에는 변경할 수 없습니다.");
+  if (room.status === "PLAYING") throw new Error("게임 중에는 변경할 수 없습니다.");
 
   const trimmed = name.trim();
   if (trimmed.length === 0) throw new Error("방 제목을 입력해주세요.");
@@ -218,6 +220,9 @@ export const updateRoomSettings = (
 
   room.name = trimmed;
   room.game = idleGame;
+  // 게임이 끝난 뒤(FINISHED) 설정을 바꿨으면 새 게임은 비어있는 초기
+  // 상태이므로, 대기 화면으로 돌아가야 등수표 같은 낡은 화면이 안 남는다.
+  room.status = "WAITING";
 };
 
 export interface PublicPlayerState {

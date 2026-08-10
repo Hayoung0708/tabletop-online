@@ -43,11 +43,14 @@ const NORMAL_RANK_ORDER: readonly Rank[] = [
 const BURN_STACK_SIZE = 4;
 
 /**
- * 카드 랭크가 어떤 카드 위에도 낼 수 있는 와일드(2, 10)인지 확인한다.
+ * 카드 랭크가 어떤 카드 위에도 낼 수 있는 와일드(2, 7, 10)인지 확인한다.
+ * 7은 내는 조건만 와일드이고, 낸 뒤 다음 사람이 봐야 할 기준은
+ * getEffectiveTopCard가 따로 처리한다(7 아래 카드 기준).
  * @param rank - 확인할 랭크
  * @returns 와일드 여부
  */
-export const isWildRank = (rank: Rank): boolean => rank === "2" || rank === "10";
+export const isWildRank = (rank: Rank): boolean =>
+  rank === "2" || rank === "7" || rank === "10";
 
 /**
  * 조커 없는 표준 52장 덱을 만든다.

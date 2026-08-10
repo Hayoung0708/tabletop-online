@@ -27,6 +27,24 @@ export const FACE_DOWN_SLOT_TOP_PX = 10;
 /** 손패에 카드가 새로 들어올 때 기존 카드가 옆으로 밀리는 시간(ms). */
 export const HAND_SHIFT_MS = 320;
 
+/** 바닥패를 뒤집을 때, 뒤집히는 동작 절반(닫힘 또는 열림)의 시간(ms). */
+export const FACE_DOWN_FLIP_HALF_MS = 180;
+
+/** 바닥패가 뒤집히는 전체 시간(ms, 닫힘+열림). */
+export const FACE_DOWN_FLIP_MS = FACE_DOWN_FLIP_HALF_MS * 2;
+
+/** 바닥패가 뒤집힌 채로 앞면을 보여주는 시간(ms). 이 시간이 지나야 실제로 반영된다. */
+export const FACE_DOWN_HOLD_MS = 1000;
+
+/** 게임이 끝나는 마지막 패를 낸 뒤, 결과 화면으로 넘어가기 전 잠깐 멈추는 시간(ms). */
+export const GAME_OVER_HOLD_MS = 1000;
+
+/** 더미가 다 쌓인 모습을 보여준 채로 유지하는 시간(ms) — 이 시간이 지나야 태운다. */
+export const BURN_HOLD_MS = 250;
+
+/** 더미가 타서 사라지는 연출 시간(ms). */
+export const BURN_VANISH_MS = 400;
+
 /** 바닥패 3자리를 돌린 뒤 손패 딜이 시작되는 시점(ms, 딜 시작 기준). */
 export const HAND_PHASE_OFFSET_MS = FACE_DOWN_DEAL_SLOTS * CARD_FLIGHT_STAGGER_MS;
 

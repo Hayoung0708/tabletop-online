@@ -47,7 +47,8 @@ const buildSidebarExtraLine = (
   return (userId) => {
     const p = players.find((pl) => pl.userId === userId);
     if (!p) return null;
-    return `카드 ${p.handCount + p.faceUp.length + p.faceDownCount}장`;
+    const faceDownLeft = p.faceDown.filter(Boolean).length;
+    return `카드 ${p.handCount + p.faceUp.length + faceDownLeft}장`;
   };
 };
 
@@ -143,7 +144,8 @@ export const RoomClient = ({ code, roomName, userId }: RoomClientProps): JSX.Ele
                   </p>
                 )}
 
-                {state.status === "WAITING" && (
+                {(state.status === "WAITING" ||
+                  (state.status === "FINISHED" && state.game.type === "SHITHEAD")) && (
                   <WaitingPanel
                     players={state.players}
                     activePlayerCount={activePlayers.length}
@@ -165,11 +167,7 @@ export const RoomClient = ({ code, roomName, userId }: RoomClientProps): JSX.Ele
                       onLeaveRoom={leaveRoom}
                     />
                   ) : (
-                    <ShitheadGameBoard
-                      state={state}
-                      userId={userId}
-                      onLeaveRoom={leaveRoom}
-                    />
+                    <ShitheadGameBoard state={state} userId={userId} />
                   ))}
 
                 {me === null && (

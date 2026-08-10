@@ -12,7 +12,7 @@ export interface MyZonesProps {
   userId: string;
   hand: Card[];
   faceUp: Card[];
-  faceDownCount: number;
+  faceDown: boolean[];
   pile: Card[];
   isMyTurn: boolean;
   onPlayCards: (cardIds: string[]) => void;
@@ -28,7 +28,7 @@ export interface MyZonesProps {
  * @param props.userId
  * @param props.hand
  * @param props.faceUp
- * @param props.faceDownCount
+ * @param props.faceDown
  * @param props.pile
  * @param props.isMyTurn
  * @param props.onPlayCards
@@ -40,7 +40,7 @@ export const MyZones = ({
   userId,
   hand,
   faceUp,
-  faceDownCount,
+  faceDown,
   pile,
   isMyTurn,
   onPlayCards,
@@ -90,7 +90,7 @@ export const MyZones = ({
       >
         <FaceCardSlots
           faceUp={faceUp}
-          faceDownCount={faceDownCount}
+          faceDown={faceDown}
           selectedIds={hand.length === 0 ? selectedIds : undefined}
           anchorUserId={userId}
           isFaceUpLegal={hand.length === 0 ? isLegal : (): boolean => false}
@@ -102,19 +102,21 @@ export const MyZones = ({
           data-hand-align="end"
           className="flex min-h-[5.625rem] min-w-0 flex-1 items-end sm:min-h-[6.625rem]"
         >
-          {hand.length > 0 && (
-            <CardFan cardKeys={hand.map((c) => c.id)} playerId={userId}>
-              {hand.map((card) => (
-                <PlayingCard
-                  key={card.id}
-                  card={card}
-                  selected={selectedIds.includes(card.id)}
-                  disabled={!isLegal(card)}
-                  onClick={isMyTurn ? (): void => toggleCard(card) : undefined}
-                />
-              ))}
-            </CardFan>
-          )}
+          {/* 손패가 0장이어도(블라인드 단계) 항상 마운트해 둔다 — 조건부로
+              마운트하면 훅이 매번 새로 시작해 "0장→첫 카드" 전환에서 비교할
+              이전 위치가 없어, 바닥패를 뒤집어 손패로 들어오는 첫 카드가
+              날아오지 않고 그냥 나타나 보인다. */}
+          <CardFan cardKeys={hand.map((c) => c.id)} playerId={userId}>
+            {hand.map((card) => (
+              <PlayingCard
+                key={card.id}
+                card={card}
+                selected={selectedIds.includes(card.id)}
+                disabled={!isLegal(card)}
+                onClick={isMyTurn ? (): void => toggleCard(card) : undefined}
+              />
+            ))}
+          </CardFan>
         </div>
       </div>
 
