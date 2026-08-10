@@ -35,7 +35,8 @@ export const StarterAnnounceToast = ({
   };
 
   return (
-    <div className="pointer-events-none fixed inset-0 z-50 flex items-center justify-center">
+    // z-[60]: 상대 손패 컨테이너(z-50, 비행 오버레이보다 위)보다도 위에 떠야 한다.
+    <div className="pointer-events-none fixed inset-0 z-[60] flex items-center justify-center">
       <div
         className={`animate__animated ${className} rounded-2xl bg-slate-900/90 px-8 py-5 text-2xl font-bold text-indigo-200 shadow-xl ring-1 ring-indigo-500`}
         style={style}

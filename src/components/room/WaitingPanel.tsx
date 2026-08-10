@@ -3,6 +3,7 @@
 import { useState, type JSX } from "react";
 import { GAMES } from "@/constants/games";
 import { ROOM_NAME_MAX_LENGTH } from "@/constants/app";
+import { SHITHEAD_MAX_PLAYERS } from "@/constants/shithead";
 import type { PublicRoomState } from "@/server/roomManager";
 
 const MIN_PLAYERS_TO_START = 2;
@@ -46,7 +47,10 @@ export const WaitingPanel = ({
   onUpdateRoom,
 }: WaitingPanelProps): JSX.Element => {
   const winnerNickname = players.find((p) => p.userId === winnerUserId)?.nickname ?? "-";
-  const canStart = activePlayerCount >= MIN_PLAYERS_TO_START;
+  // 싯헤드는 52장 덱 한계로 5명까지만 시작할 수 있다(방 정원 6명과는 별개).
+  const tooManyForGame =
+    gameType === "SHITHEAD" && activePlayerCount > SHITHEAD_MAX_PLAYERS;
+  const canStart = activePlayerCount >= MIN_PLAYERS_TO_START && !tooManyForGame;
 
   const [editing, setEditing] = useState(false);
   const [nameDraft, setNameDraft] = useState(roomName);
@@ -75,6 +79,11 @@ export const WaitingPanel = ({
       <p className="text-base text-slate-400">
         플레이어를 기다리는 중입니다 ({activePlayerCount}/{maxPlayers})
       </p>
+      {tooManyForGame && (
+        <p className="mt-2 text-sm text-amber-400">
+          싯헤드는 최대 {SHITHEAD_MAX_PLAYERS}명까지 플레이할 수 있습니다
+        </p>
+      )}
 
       {isHost && editing ? (
         <div className="mx-auto mt-5 flex max-w-sm flex-col gap-3 text-left">

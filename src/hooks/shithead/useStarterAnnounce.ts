@@ -24,6 +24,13 @@ export const useStarterAnnounce = (
 ): StarterAnnounceState | null => {
   const [state, setState] = useState<StarterAnnounceState | null>(null);
   const wasAllSelected = useRef(false);
+  // 이름은 ref로 읽는다 — 의존성에 넣으면 토스트가 떠 있는 동안 턴이 넘어가
+  // 이름이 바뀔 때마다 이펙트가 재실행되면서 퇴장 타이머만 지워지고(가드에
+  // 걸려 새로 걸지도 않음) 토스트가 화면에서 영영 안 내려간다.
+  const starterNameRef = useRef(starterName);
+  useEffect(() => {
+    starterNameRef.current = starterName;
+  });
 
   useEffect(() => {
     if (!allSelected || wasAllSelected.current) {
@@ -32,7 +39,7 @@ export const useStarterAnnounce = (
     }
     wasAllSelected.current = true;
 
-    setState({ name: starterName, phase: "in" });
+    setState({ name: starterNameRef.current, phase: "in" });
     const toOut = setTimeout(() => {
       setState((prev) => (prev ? { ...prev, phase: "out" } : prev));
     }, STARTER_TOAST_MS);
@@ -45,7 +52,7 @@ export const useStarterAnnounce = (
       clearTimeout(toOut);
       clearTimeout(toGone);
     };
-  }, [allSelected, starterName]);
+  }, [allSelected]);
 
   return state;
 };
