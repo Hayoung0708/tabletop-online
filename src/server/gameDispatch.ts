@@ -18,6 +18,12 @@ import {
   publicShitheadGameState,
   startShitheadGame,
 } from "@/server/shithead/gameLogic";
+import {
+  checkOneCardLastPlayerStanding,
+  createIdleOneCardGame,
+  publicOneCardGameState,
+  startOneCardGame,
+} from "@/server/onecard/gameLogic";
 
 /**
  * gameType 문자열에 맞는, 아직 시작하지 않은 게임 상태를 만든다.
@@ -26,6 +32,7 @@ import {
  */
 export const createIdleGame = (gameType: string): GameData => {
   if (gameType === "SHITHEAD") return createIdleShitheadGame();
+  if (gameType === "ONECARD") return createIdleOneCardGame();
   return createIdleYatzyGame();
 };
 
@@ -36,6 +43,10 @@ export const createIdleGame = (gameType: string): GameData => {
 export const startGameData = (room: RoomState): void => {
   if (room.game.type === "SHITHEAD") {
     startShitheadGame(room);
+    return;
+  }
+  if (room.game.type === "ONECARD") {
+    startOneCardGame(room);
     return;
   }
   startYatzyGame(room);
@@ -55,7 +66,9 @@ export const buildPublicRoomState = (
   const game: PublicGameState =
     room.game.type === "SHITHEAD"
       ? publicShitheadGameState(room, forUserId)
-      : publicYatzyGameState(room);
+      : room.game.type === "ONECARD"
+        ? publicOneCardGameState(room, forUserId)
+        : publicYatzyGameState(room);
   return publicRoomState(room, game);
 };
 
@@ -68,5 +81,6 @@ export const checkLastPlayerStanding = (
   room: RoomState,
 ): LastPlayerStandingResult | null => {
   if (room.game.type === "SHITHEAD") return checkShitheadLastPlayerStanding(room);
+  if (room.game.type === "ONECARD") return checkOneCardLastPlayerStanding(room);
   return checkYatzyLastPlayerStanding(room);
 };

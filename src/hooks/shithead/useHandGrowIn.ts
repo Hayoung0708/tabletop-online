@@ -12,7 +12,7 @@ import {
   CARD_TAKE_FROM_PILE_SOUND_SRC,
 } from "@/constants/media";
 import { playSoundOnce } from "@/utils/sound";
-import { getHandGrowSource } from "@/hooks/shithead/handGrowSource";
+import { getHandGrowSound, getHandGrowSource } from "@/hooks/shithead/handGrowSource";
 
 /** 카드 이동에 쓰는 공통 이징 — 빠르게 나갔다가 부드럽게 안착한다. */
 const EASING = "cubic-bezier(0.22, 1, 0.36, 1)";
@@ -106,7 +106,11 @@ export const useHandGrowIn = (
     });
 
     if (tookNewCards) {
-      if (sourceAnchor === SHITHEAD_ANCHOR.pile) {
+      const overrideSound = getHandGrowSound(playerId);
+      if (overrideSound) {
+        // 출발 지점과 무관하게 지정된 소리(원카드 공격 벌칙 등)를 쓴다.
+        playSoundOnce(overrideSound);
+      } else if (sourceAnchor === SHITHEAD_ANCHOR.pile) {
         playSoundOnce(CARD_TAKE_FROM_PILE_SOUND_SRC);
       } else {
         // 보충은 직전 착지 소리와 붙어 들리지 않게 조금 늦춰 재생한다.

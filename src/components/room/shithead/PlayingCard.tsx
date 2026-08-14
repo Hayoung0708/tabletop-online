@@ -13,8 +13,18 @@ const SUIT_ICON: Record<Card["suit"], typeof Club> = {
 
 const RED_SUITS: readonly Card["suit"][] = ["diamonds", "hearts"];
 
+/**
+ * 화면에 그릴 수 있는 카드 모양 — 싯헤드 카드는 그대로 맞고, 원카드의
+ * 조커(rank "JOKER", suit null)도 허용한다.
+ */
+export interface DisplayCard {
+  id: string;
+  rank: string;
+  suit: Card["suit"] | null;
+}
+
 export interface PlayingCardProps {
-  card?: Card;
+  card?: DisplayCard;
   faceDown?: boolean;
   selected?: boolean;
   onClick?: () => void;
@@ -70,8 +80,9 @@ export const PlayingCard = ({
     );
   }
 
-  const isRed = RED_SUITS.includes(card.suit);
-  const SuitIcon = SUIT_ICON[card.suit];
+  const isRed = card.suit !== null && RED_SUITS.includes(card.suit);
+  const SuitIcon = card.suit !== null ? SUIT_ICON[card.suit] : null;
+  const isJoker = card.rank === "JOKER";
 
   // border-* 유틸리티는 하나만 넣어야 한다 — 두 개를 동시에 넣으면(예:
   // border-slate-300 border-[#432dd7]) Tailwind가 어느 걸 우선할지 보장이
@@ -95,8 +106,8 @@ export const PlayingCard = ({
         onClick && !disabled ? "cursor-pointer hover:-translate-y-1" : "cursor-default"
       }`}
     >
-      <span>{card.rank}</span>
-      <SuitIcon className="h-4 w-4" fill="currentColor" />
+      {isJoker ? <span className="text-3xl">🃏</span> : <span>{card.rank}</span>}
+      {SuitIcon && <SuitIcon className="h-4 w-4" fill="currentColor" />}
     </button>
   );
 };

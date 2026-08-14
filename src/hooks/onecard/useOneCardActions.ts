@@ -1,0 +1,31 @@
+"use client";
+
+import { getSocket } from "@/lib/socket";
+import type { Suit } from "@/server/shithead/deck";
+
+export interface UseOneCardActionsResult {
+  playCard: (cardId: string, suit?: Suit) => void;
+  drawCards: () => void;
+}
+
+/**
+ * 원카드 화면에서만 쓰는 소켓 액션들을 모아 둔다.
+ * @returns 원카드 전용 액션 함수 모음
+ */
+export const useOneCardActions = (): UseOneCardActionsResult => {
+  /**
+   * 카드 한 장을 낸다.
+   * @param cardId - 내려는 카드 id
+   * @param suit - 7을 낼 때 지정할 무늬
+   */
+  const playCard = (cardId: string, suit?: Suit): void => {
+    getSocket().emit("onecard_play", { cardId, suit });
+  };
+
+  /** 낼 카드가 없어서(또는 공격을 못 막아서) 덱에서 카드를 먹는다. */
+  const drawCards = (): void => {
+    getSocket().emit("onecard_draw");
+  };
+
+  return { playCard, drawCards };
+};

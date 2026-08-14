@@ -4,6 +4,7 @@ import { Children, useState, type CSSProperties, type JSX, type ReactNode } from
 import { useMeasuredWidth } from "@/hooks/useMeasuredWidth";
 import { useDealing } from "@/components/room/shithead/DealingContext";
 import { useHandDealIn } from "@/hooks/shithead/useHandDealIn";
+import { useHandDealInOnMount } from "@/hooks/shithead/useHandDealInOnMount";
 import { useHandGrowIn } from "@/hooks/shithead/useHandGrowIn";
 import { computeFanHoverShifts, computeHandMargin } from "@/utils/shithead";
 
@@ -22,6 +23,11 @@ export interface CardFanProps {
   cardKeys?: string[];
   /** 이 손패의 주인 — 새 카드가 어디서 오는지(덱/더미) 찾는 데 쓴다. */
   playerId?: string;
+  /**
+   * true면 마운트 직후 카드들이 덱에서 날아드는 딜 연출을 한다. 딜 소켓
+   * 이벤트가 따로 없는 게임(원카드)이 게임 시작 직후에만 켠다.
+   */
+  dealInOnMount?: boolean;
 }
 
 /**
@@ -34,6 +40,7 @@ export interface CardFanProps {
  * @param props.dealInOnStart - 딜 시작에 맞춰 덱에서 날아드는 연출 여부
  * @param props.cardKeys - 카드별 고유 키
  * @param props.playerId - 이 손패의 주인
+ * @param props.dealInOnMount - 마운트 직후 덱에서 날아드는 딜 연출 여부
  * @returns 겹침 레이아웃 엘리먼트
  */
 export const CardFan = ({
@@ -41,11 +48,13 @@ export const CardFan = ({
   dealInOnStart = false,
   cardKeys,
   playerId,
+  dealInOnMount = false,
 }: CardFanProps): JSX.Element => {
   const [ref, width] = useMeasuredWidth<HTMLDivElement>();
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
   const dealing = useDealing();
   const flying = useHandDealIn(ref, dealInOnStart);
+  useHandDealInOnMount(ref, dealInOnMount);
   const cards = Children.toArray(children);
   const marginPx = computeHandMargin(cards.length, width);
   const shifts = computeFanHoverShifts(cards.length, width, hoveredIndex);

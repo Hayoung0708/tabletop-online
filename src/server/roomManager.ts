@@ -4,11 +4,13 @@ import type {
   PublicShitheadGameState,
   ShitheadGameData,
 } from "@/server/shithead/gameLogic";
+import type { OneCardGameData, PublicOneCardGameState } from "@/server/onecard/gameLogic";
 
 const MIN_PLAYERS_TO_START = 2;
 
-export type GameData = YatzyGameData | ShitheadGameData;
-export type PublicGameState = PublicYatzyGameState | PublicShitheadGameState;
+export type GameData = YatzyGameData | ShitheadGameData | OneCardGameData;
+export type PublicGameState =
+  PublicYatzyGameState | PublicShitheadGameState | PublicOneCardGameState;
 
 export interface PlayerState {
   userId: string;

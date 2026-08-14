@@ -25,9 +25,8 @@ export const GAMES: readonly GameOption[] = [
   {
     id: "ONECARD",
     label: "원카드",
-    desc: "추후 업데이트 예정",
+    desc: "같은 무늬나 숫자를 이어 내고, 손패를 가장 먼저 다 내면 승리",
     icon: "/icons/onecard.svg",
-    disabled: true,
   },
   {
     id: "HULA",

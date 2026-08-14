@@ -47,6 +47,13 @@ import {
   type PlayResult,
 } from "@/server/shithead/gameLogic";
 import {
+  drawOneCards,
+  finalizeOneCardGameOver,
+  oneCardRankOf,
+  playOneCard,
+} from "@/server/onecard/gameLogic";
+import type { Suit } from "@/server/shithead/deck";
+import {
   BURN_HOLD_MS,
   CARD_FLIGHT_DURATION_MS,
   FACE_DOWN_FLIP_MS,
@@ -139,6 +146,42 @@ app.prepare().then(() => {
       where: { code: room.code },
       data: { status: "FINISHED", finishedAt: new Date() },
     });
+  };
+
+  /**
+   * 원카드 게임이 끝났을 때 각 플레이어의 등수를 DB에 반영한다.
+   * @param room - 대상 방 (game.type === "ONECARD")
+   */
+  const persistOneCardResults = async (room: RoomState): Promise<void> => {
+    if (room.game.type !== "ONECARD") return;
+    await Promise.all(
+      room.players.map((p) =>
+        prisma.roomPlayer.update({
+          where: { roomId_playerId: { roomId: room.dbId, playerId: p.userId } },
+          data: { score: oneCardRankOf(room, p.userId) },
+        }),
+      ),
+    );
+    await prisma.room.update({
+      where: { code: room.code },
+      data: { status: "FINISHED", finishedAt: new Date() },
+    });
+  };
+
+  /**
+   * 원카드 게임이 끝났을 때: 마지막 카드 비행/파산 정리 연출이 끝날 때까지
+   * 기다렸다가 결과 화면으로 전환하고 등수를 저장한다.
+   * @param room - 대상 방
+   * @param delay - 결과 화면 전환까지 기다릴 시간(ms)
+   */
+  const scheduleOneCardGameOver = (room: RoomState, delay: number): void => {
+    setTimeout(() => {
+      void (async (): Promise<void> => {
+        finalizeOneCardGameOver(room);
+        await broadcastRoomState(room);
+        await persistOneCardResults(room);
+      })();
+    }, delay);
   };
 
   /**
@@ -583,6 +626,54 @@ app.prepare().then(() => {
           count: taken,
         });
         await broadcastRoomState(room);
+      } catch (err) {
+        socket.emit("error_message", (err as Error).message);
+      }
+    });
+
+    socket.on(
+      "onecard_play",
+      async ({ cardId, suit }: { cardId: string; suit?: Suit }) => {
+        if (!roomCode) return;
+        const code = roomCode;
+        const room = getRoom(code);
+        if (!room) return;
+
+        try {
+          const result = playOneCard(room, socket.data.userId, cardId, suit);
+          // 낸 카드가 손에서 더미로 날아가는 연출용 — 싯헤드와 같은 오버레이를 쓴다.
+          io.to(code).emit("onecard_play", {
+            playerId: socket.data.userId,
+            cards: [result.played],
+          });
+          await broadcastRoomState(room);
+          if (result.gameOver) {
+            scheduleOneCardGameOver(room, cardsFlightMs(1) + GAME_OVER_HOLD_MS);
+          }
+        } catch (err) {
+          socket.emit("error_message", (err as Error).message);
+        }
+      },
+    );
+
+    socket.on("onecard_draw", async () => {
+      if (!roomCode) return;
+      const room = getRoom(roomCode);
+      if (!room) return;
+
+      try {
+        const result = drawOneCards(room, socket.data.userId);
+        // 새 카드가 덱에서 손패로 날아오는 연출은 손패 증가를 감지하는
+        // useHandGrowIn이 처리한다. 여기서는 어떤 소리를 낼지만 미리 알린다
+        // (공격 벌칙이면 더미를 쓸어오는 소리, 아니면 덱에서 뽑는 소리).
+        io.to(roomCode).emit("onecard_draw", {
+          playerId: socket.data.userId,
+          penalty: result.drawn > 1,
+        });
+        await broadcastRoomState(room);
+        if (result.gameOver) {
+          scheduleOneCardGameOver(room, GAME_OVER_HOLD_MS);
+        }
       } catch (err) {
         socket.emit("error_message", (err as Error).message);
       }
