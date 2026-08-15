@@ -45,3 +45,6 @@ next-env.d.ts
 # local dev db
 *.db
 *.db-journal
+
+# OMC 세션 런타임 상태 (세션별로 계속 바뀜)
+.omc/
