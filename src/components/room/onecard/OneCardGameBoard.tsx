@@ -1,12 +1,17 @@
 "use client";
 
-import { useEffect, type JSX } from "react";
+import { useEffect, useRef, type JSX } from "react";
+import { josa } from "es-hangul";
 import { getSocket } from "@/lib/socket";
 import { OneCardOpponentRow } from "@/components/room/onecard/OneCardOpponentRow";
 import { OneCardCenter } from "@/components/room/onecard/OneCardCenter";
 import { OneCardMyHand } from "@/components/room/onecard/OneCardMyHand";
 import { OneCardFinishedPanel } from "@/components/room/onecard/OneCardFinishedPanel";
+import { StarterAnnounceToast } from "@/components/room/shithead/StarterAnnounceToast";
+import { Toast } from "@/components/feedback/Toast";
 import { useOneCardActions } from "@/hooks/onecard/useOneCardActions";
+import { useStarterAnnounce } from "@/hooks/shithead/useStarterAnnounce";
+import { useToast } from "@/hooks/useToast";
 import { setHandGrowSource } from "@/hooks/shithead/handGrowSource";
 import {
   CARD_TAKE_FROM_DECK_SOUND_SRC,
@@ -36,7 +41,62 @@ export const OneCardGameBoard = ({
   state,
   userId,
 }: OneCardGameBoardProps): JSX.Element | null => {
-  const { playCard, drawCards } = useOneCardActions();
+  const { playCard, drawCards, callOneCard } = useOneCardActions();
+  const [toast, setToast] = useToast();
+
+  const game = state.game.type === "ONECARD" ? state.game : null;
+
+  /**
+   * 게스트 id로 닉네임을 찾는다.
+   * @param id - 찾을 게스트 id
+   * @returns 닉네임, 없으면 "-"
+   */
+  const nicknameOf = (id: string): string =>
+    state.players.find((p) => p.userId === id)?.nickname ?? "-";
+
+  // 토스트 문구를 만들 때 최신 닉네임이 필요하지만, 구독은 한 번만 걸어야 한다.
+  const nicknameOfRef = useRef(nicknameOf);
+  useEffect(() => {
+    nicknameOfRef.current = nicknameOf;
+  });
+
+  useEffect(() => {
+    const socket = getSocket();
+    /**
+     * 외치기 판정 결과 — 성공/실패를 토스트로 알린다.
+     * @param root0 - 이벤트 페이로드
+     * @param root0.playerId - 외쳤어야 하는 플레이어
+     * @param root0.callerId
+     * @param root0.success - 당사자가 제때 외쳤는지
+     */
+    const onCallResult = ({
+      playerId,
+      callerId,
+      success,
+    }: {
+      playerId: string;
+      callerId?: string;
+      success: boolean;
+    }): void => {
+      const name = nicknameOfRef.current(playerId);
+      if (success) {
+        setToast({ text: `${name} 원카드!`, tone: "ok" });
+        return;
+      }
+      const caller = nicknameOfRef.current(callerId ?? "");
+      setToast({ text: `${josa(caller, "이/가")} ${name} 원카드 방어!`, tone: "error" });
+    };
+    socket.on("onecard_call_result", onCallResult);
+    return (): void => {
+      socket.off("onecard_call_result", onCallResult);
+    };
+  }, [setToast]);
+
+  // 게임이 시작된 순간(아직 아무도 수를 두지 않았을 때) 시작 플레이어를 알린다.
+  const starterAnnounce = useStarterAnnounce(
+    state.status === "PLAYING" && game?.movesMade === 0,
+    nicknameOf(game?.currentPlayerId ?? ""),
+  );
 
   // 먹기 소리는 손패가 늘어나는 순간 바로 나야 한다. 소리를 지정하지 않으면
   // useHandGrowIn이 싯헤드 보충용 지연(REFILL_SOUND_DELAY_MS)을 태워 늦게
@@ -69,18 +129,9 @@ export const OneCardGameBoard = ({
     };
   }, []);
 
-  const game = state.game.type === "ONECARD" ? state.game : null;
   if (!game) return null;
   const me = game.players.find((p) => p.userId === userId);
   if (!me) return null;
-
-  /**
-   * 게스트 id로 닉네임을 찾는다.
-   * @param id - 찾을 게스트 id
-   * @returns 닉네임, 없으면 "-"
-   */
-  const nicknameOf = (id: string): string =>
-    state.players.find((p) => p.userId === id)?.nickname ?? "-";
 
   const isMyTurn = game.currentPlayerId === userId;
   // 아직 아무도 수를 두지 않았으면 게임 시작 직후 — 손패 딜 연출을 재생한다.
@@ -141,8 +192,10 @@ export const OneCardGameBoard = ({
             declaredSuit={game.declaredSuit}
             isMyTurn={isMyTurn}
             dealIn={dealIn}
+            callPending={game.pendingCallPlayerId !== null}
             onPlayCard={playCard}
             onDraw={drawCards}
+            onCall={callOneCard}
           />
         </>
       )}
@@ -150,6 +203,9 @@ export const OneCardGameBoard = ({
       {state.status === "FINISHED" && (
         <OneCardFinishedPanel players={state.players} oneCardPlayers={game.players} />
       )}
+
+      <StarterAnnounceToast announce={starterAnnounce} />
+      <Toast toast={toast} />
     </>
   );
 };

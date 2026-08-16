@@ -124,6 +124,14 @@ export const RULEBOOKS: Record<"YATZY" | "SHITHEAD" | "ONECARD", Rulebook> = {
         ],
       },
       {
+        heading: "원카드 외치기",
+        items: [
+          "손패가 한 장 남으면 모두에게 '원카드!' 버튼이 뜹니다.",
+          "본인이 먼저 누르면 성공, 다른 사람이 먼저 누르면 지적당해 2장을 먹습니다.",
+          "거의 동시에 눌렀다면 한 장 남은 본인이 이깁니다.",
+        ],
+      },
+      {
         heading: "기술 카드",
         items: [
           "J: 다음 사람을 건너뜁니다.",

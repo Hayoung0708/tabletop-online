@@ -47,11 +47,14 @@ import {
   type PlayResult,
 } from "@/server/shithead/gameLogic";
 import {
+  callOneCard,
   drawOneCards,
   finalizeOneCardGameOver,
   oneCardRankOf,
+  penalizeMissedOneCardCall,
   playOneCard,
 } from "@/server/onecard/gameLogic";
+import { ONE_CARD_CALL_GRACE_MS } from "@/constants/onecard";
 import type { Suit } from "@/server/shithead/deck";
 import {
   BURN_HOLD_MS,
@@ -236,6 +239,9 @@ app.prepare().then(() => {
       }, delay);
     }
   };
+
+  // 원카드 외치기 지적이 들어온 방 — 유예 시간 동안 판정을 미뤄 두는 타이머.
+  const missedCallTimers = new Map<string, NodeJS.Timeout>();
 
   const lastPlayerTimers = new Map<string, NodeJS.Timeout>();
 
@@ -677,6 +683,44 @@ app.prepare().then(() => {
       } catch (err) {
         socket.emit("error_message", (err as Error).message);
       }
+    });
+
+    socket.on("onecard_call", () => {
+      if (!roomCode) return;
+      const code = roomCode;
+      const room = getRoom(code);
+      if (!room || room.game.type !== "ONECARD") return;
+
+      const targetId = room.game.pendingCallPlayerId;
+      if (!targetId) return;
+      const callerId = socket.data.userId;
+
+      // 당사자가 외쳤으면 바로 성공 — 지적 판정을 기다리던 타이머는 외치기가
+      // 이미 풀린 걸 보고 그냥 지나간다.
+      if (callerId === targetId) {
+        callOneCard(room, callerId);
+        io.to(code).emit("onecard_call_result", { playerId: targetId, success: true });
+        void broadcastRoomState(room);
+        return;
+      }
+
+      // 지적은 곧바로 처리하지 않는다 — 거의 동시에 눌렀을 때 당사자가 이기도록
+      // 유예 시간만큼 기다렸다가, 그때까지 안 외쳤으면 벌칙을 준다.
+      if (missedCallTimers.has(code)) return;
+      const timer = setTimeout(() => {
+        missedCallTimers.delete(code);
+        const drawn = penalizeMissedOneCardCall(room, targetId);
+        if (drawn === null) return;
+        io.to(code).emit("onecard_call_result", {
+          playerId: targetId,
+          callerId,
+          success: false,
+        });
+        // 벌칙 카드도 덱에서 날아오는 연출을 쓰되 소리는 여러 장 쓸어오는 소리로.
+        io.to(code).emit("onecard_draw", { playerId: targetId, penalty: true });
+        void broadcastRoomState(room);
+      }, ONE_CARD_CALL_GRACE_MS);
+      missedCallTimers.set(code, timer);
     });
 
     socket.on("emote", ({ emoteId }: { emoteId: string }) => {

@@ -13,6 +13,8 @@ const HAND_DEAL_SIZE_2P = 7;
 const HAND_DEAL_SIZE = 5;
 /** 손패가 이 장수 이상이 되면 파산(즉시 탈락). */
 const BANKRUPT_HAND_SIZE = 20;
+/** "원카드"를 안 외쳤다가 지적당했을 때 먹는 장수. */
+const MISSED_CALL_PENALTY = 2;
 
 export interface OneCardGameData {
   type: "ONECARD";
@@ -33,6 +35,11 @@ export interface OneCardGameData {
   bankruptOrder: string[];
   /** 시작 이후 진행된 수(내기/먹기)의 횟수. 0이면 게임 시작 직후다. */
   movesMade: number;
+  /**
+   * "원카드"를 외쳐야 하는 플레이어. 손패가 한 장이 된 순간 정해지고, 본인이
+   * 외치거나 다른 사람에게 지적당하면(또는 손패가 한 장이 아니게 되면) 풀린다.
+   */
+  pendingCallPlayerId: string | null;
 }
 
 /**
@@ -52,6 +59,7 @@ export const createIdleOneCardGame = (): OneCardGameData => ({
   finishedOrder: [],
   bankruptOrder: [],
   movesMade: 0,
+  pendingCallPlayerId: null,
 });
 
 /**
@@ -107,6 +115,7 @@ export const startOneCardGame = (room: RoomState): void => {
     finishedOrder: [],
     bankruptOrder: [],
     movesMade: 0,
+    pendingCallPlayerId: null,
   };
 };
 
@@ -198,8 +207,32 @@ export interface OneCardPlayResult {
 }
 
 /**
- * 손패에서 카드 한 장을 낸다. 특수 카드 효과(공격 누적, 점프, 방향 전환,
- * 한 번 더, 무늬 지정)까지 처리하고 다음 차례를 정한다.
+ * 낸 카드의 특수 효과(공격 누적, 무늬 지정, 방향 전환)를 적용하고,
+ * 다음 차례까지 건너뛸 칸 수를 돌려준다.
+ * @param game - 원카드 게임 상태
+ * @param card - 방금 낸 카드
+ * @param declaredSuit - 7로 지정한 무늬
+ * @param finished - 이 플레이로 손패를 다 털었는지
+ * @returns 다음 차례를 정할 때 이동할 칸 수
+ */
+const applyCardEffect = (
+  game: OneCardGameData,
+  card: OneCard,
+  declaredSuit: Suit | undefined,
+  finished: boolean,
+): number => {
+  game.attackStack += attackValueOf(card.rank);
+  game.declaredSuit = card.rank === "7" ? (declaredSuit as Suit) : null;
+  if (card.rank === "Q") game.direction = game.direction === 1 ? -1 : 1;
+
+  // K는 한 번 더(0칸), J는 다음 사람 건너뜀(2칸). 완주했으면 한 번 더는
+  // 의미가 없으므로 그냥 다음 사람에게 넘긴다.
+  if (card.rank === "K" && !finished) return 0;
+  return card.rank === "J" ? 2 : 1;
+};
+
+/**
+ * 손패에서 카드 한 장을 낸다. 특수 카드 효과까지 처리하고 다음 차례를 정한다.
  * @param room - 대상 방
  * @param requesterId - 요청한 게스트 id
  * @param cardId - 내려는 카드 id
@@ -216,39 +249,34 @@ export const playOneCard = (
   assertTurn(room, game, requesterId);
 
   const hand = game.hands[requesterId];
-  const card = hand.find((c) => c.id === cardId);
-  if (!card) throw new Error("가지고 있지 않은 카드입니다.");
+  const played = hand.find((c) => c.id === cardId);
+  if (!played) throw new Error("가지고 있지 않은 카드입니다.");
 
   const top = game.pile[game.pile.length - 1];
-  if (!top || !canPlayOneCard(top, card, game.declaredSuit, game.attackStack)) {
+  if (!top || !canPlayOneCard(top, played, game.declaredSuit, game.attackStack)) {
     throw new Error("낼 수 없는 카드입니다.");
   }
-  if (card.rank === "7" && !declaredSuit) {
+  if (played.rank === "7" && !declaredSuit) {
     throw new Error("바꿀 무늬를 선택해주세요.");
   }
 
-  hand.splice(hand.indexOf(card), 1);
-  game.pile.push(card);
+  hand.splice(hand.indexOf(played), 1);
+  game.pile.push(played);
   game.movesMade += 1;
-
-  // 특수 효과
-  game.attackStack += attackValueOf(card.rank);
-  game.declaredSuit = card.rank === "7" ? (declaredSuit as Suit) : null;
-  if (card.rank === "Q") game.direction = game.direction === 1 ? -1 : 1;
 
   const finished = hand.length === 0;
   if (finished) game.finishedOrder.push(requesterId);
+  syncPendingCall(game, requesterId);
+
+  const steps = applyCardEffect(game, played, declaredSuit, finished);
 
   if (settleIfGameOver(room, game)) {
-    return { played: card, finished, gameOver: true };
+    return { played, finished, gameOver: true };
   }
 
-  // K는 한 번 더(0칸), J는 다음 사람 건너뜀(2칸). 완주했으면 한 번 더는
-  // 의미가 없으므로 그냥 다음 사람에게 넘긴다.
-  const steps = card.rank === "K" && !finished ? 0 : card.rank === "J" ? 2 : 1;
   game.currentPlayerIndex = advanceIndex(room, game, game.currentPlayerIndex, steps);
 
-  return { played: card, finished, gameOver: false };
+  return { played, finished, gameOver: false };
 };
 
 export interface OneCardDrawResult {
@@ -271,6 +299,42 @@ const replenishDeck = (game: OneCardGameData): void => {
 };
 
 /**
+ * 덱에서 카드를 뽑아 손패 앞쪽(화면 왼쪽)에 넣는다. 덱이 비면 더미를 섞어
+ * 다시 채우고, 그래도 뽑을 카드가 없으면 뽑은 만큼만 넣는다.
+ * @param game - 원카드 게임 상태
+ * @param hand - 카드를 받을 손패
+ * @param count - 뽑으려는 장수
+ * @returns 실제로 뽑은 장수
+ */
+const drawIntoHand = (game: OneCardGameData, hand: OneCard[], count: number): number => {
+  let drawn = 0;
+  for (let i = 0; i < count; i++) {
+    replenishDeck(game);
+    const card = game.deck.pop();
+    if (!card) break;
+    hand.unshift(card);
+    drawn += 1;
+  }
+  return drawn;
+};
+
+/**
+ * 손패 장수에 맞춰 "원카드" 외치기 상태를 갱신한다. 한 장이 되면 그 사람이
+ * 외칠 차례가 되고, 한 장이 아니게 되면 걸려 있던 외치기가 풀린다.
+ * 슬롯이 하나라 여러 명이 한 장인 경우 가장 최근 사람만 대상이 된다 —
+ * 지적 버튼도 하나뿐이라 화면과 규칙을 일치시키는 쪽을 택했다.
+ * @param game - 원카드 게임 상태
+ * @param playerId - 방금 수를 둔 플레이어
+ */
+const syncPendingCall = (game: OneCardGameData, playerId: string): void => {
+  if (game.hands[playerId].length === 1) {
+    game.pendingCallPlayerId = playerId;
+    return;
+  }
+  if (game.pendingCallPlayerId === playerId) game.pendingCallPlayerId = null;
+};
+
+/**
  * 카드를 먹는다: 공격이 쌓여 있으면 그만큼, 아니면 한 장. 먹은 뒤 손패가
  * 상한(20장) 이상이면 파산으로 즉시 탈락하고, 손패는 덱에 섞어 되돌린다.
  * 먹으면(또는 파산하면) 차례가 넘어간다.
@@ -287,15 +351,8 @@ export const drawOneCards = (room: RoomState, requesterId: string): OneCardDrawR
   game.movesMade += 1;
 
   const hand = game.hands[requesterId];
-  let drawn = 0;
-  for (let i = 0; i < count; i++) {
-    replenishDeck(game);
-    const card = game.deck.pop();
-    if (!card) break;
-    // 새 카드는 손패 맨 앞(화면 왼쪽)으로 — 왼쪽에서 유입되는 연출과 맞춘다.
-    hand.unshift(card);
-    drawn += 1;
-  }
+  const drawn = drawIntoHand(game, hand, count);
+  syncPendingCall(game, requesterId);
 
   const bankrupt = hand.length >= BANKRUPT_HAND_SIZE;
   if (bankrupt) {
@@ -311,6 +368,37 @@ export const drawOneCards = (room: RoomState, requesterId: string): OneCardDrawR
 
   game.currentPlayerIndex = advanceIndex(room, game, game.currentPlayerIndex, 1);
   return { drawn, bankrupt, gameOver: false };
+};
+
+/**
+ * 당사자가 "원카드"를 외쳤다 — 벌칙 없이 외치기를 끝낸다.
+ * @param room - 대상 방
+ * @param requesterId - 외친 게스트 id
+ * @returns 실제로 외칠 차례였으면 true
+ */
+export const callOneCard = (room: RoomState, requesterId: string): boolean => {
+  const game = asOneCardGame(room);
+  if (game.pendingCallPlayerId !== requesterId) return false;
+  game.pendingCallPlayerId = null;
+  return true;
+};
+
+/**
+ * 외치기를 놓친 것을 다른 사람이 지적했다 — 벌칙으로 카드를 먹인다. 차례는
+ * 그대로 두고 손패만 늘린다(한 장 남은 사람이 두 장을 더 먹는 것뿐이라
+ * 파산 상한 20장에는 닿을 수 없다).
+ * @param room - 대상 방
+ * @param targetId - 외쳤어야 하는 게스트 id
+ * @returns 벌칙으로 먹은 장수, 이미 해결된 외치기면 null
+ */
+export const penalizeMissedOneCardCall = (
+  room: RoomState,
+  targetId: string,
+): number | null => {
+  const game = asOneCardGame(room);
+  if (game.pendingCallPlayerId !== targetId) return null;
+  game.pendingCallPlayerId = null;
+  return drawIntoHand(game, game.hands[targetId], MISSED_CALL_PENALTY);
 };
 
 /**
@@ -406,6 +494,8 @@ export interface PublicOneCardGameState {
   winnerUserId: string | null;
   /** 시작 이후 진행된 수의 횟수 — 0이면 클라이언트가 딜 연출을 재생한다. */
   movesMade: number;
+  /** "원카드"를 외쳐야 하는 플레이어. null이 아니면 모두에게 외치기 버튼이 뜬다. */
+  pendingCallPlayerId: string | null;
   players: PublicOneCardPlayer[];
 }
 
@@ -432,6 +522,7 @@ export const publicOneCardGameState = (
     declaredSuit: game.declaredSuit,
     winnerUserId: game.winnerUserId,
     movesMade: game.movesMade,
+    pendingCallPlayerId: game.pendingCallPlayerId,
     players: room.players.map((p) => ({
       userId: p.userId,
       handCount: game.hands[p.userId]?.length ?? 0,

@@ -17,12 +17,15 @@ export interface OneCardMyHandProps {
   isMyTurn: boolean;
   /** 게임 시작 직후라 딜(덱에서 날아드는) 연출을 재생할지 여부. */
   dealIn: boolean;
+  /** 지금 누군가 "원카드"를 외쳐야 하는 상태인지 — 모두에게 버튼이 뜬다. */
+  callPending: boolean;
   onPlayCard: (cardId: string, suit?: Suit) => void;
   onDraw: () => void;
+  onCall: () => void;
 }
 
 /**
- * 내 손패 영역. 카드를 클릭하면 바로 낸다(7은 무늬 선택 창이 먼저 뜬다).
+ * 내 손패 영역. 카드 한 장을 골라 "내기" 버튼으로 낸다(싯헤드와 같은 조작).
  * 낼 수 없는 카드는 흐리게 표시하고, 먹기 버튼으로 덱에서 카드를 가져온다.
  * @param props - 내 손패 상태와 액션 콜백
  * @param props.userId
@@ -32,8 +35,10 @@ export interface OneCardMyHandProps {
  * @param props.declaredSuit
  * @param props.isMyTurn
  * @param props.dealIn
+ * @param props.callPending
  * @param props.onPlayCard
  * @param props.onDraw
+ * @param props.onCall
  * @returns 내 손패 영역 엘리먼트
  */
 export const OneCardMyHand = ({
@@ -44,11 +49,14 @@ export const OneCardMyHand = ({
   declaredSuit,
   isMyTurn,
   dealIn,
+  callPending,
   onPlayCard,
   onDraw,
+  onCall,
 }: OneCardMyHandProps): JSX.Element => {
-  // 7을 클릭한 뒤 무늬를 고르는 동안 어느 카드였는지 기억해 둔다.
-  const [pendingSevenId, setPendingSevenId] = useState<string | null>(null);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  // 7을 내려고 무늬를 고르는 중인지.
+  const [pickingSuit, setPickingSuit] = useState(false);
 
   // 항상 낮은 랭크(A)가 왼쪽, 조커가 맨 오른쪽에 오도록 정렬한다. 카드 id가
   // 유지되므로 CardFan의 FLIP 애니메이션이 자리 이동을 자연스럽게 보여준다.
@@ -64,16 +72,23 @@ export const OneCardMyHand = ({
     top ? canPlayOneCard(top, card, declaredSuit, attackStack) : false;
 
   /**
-   * 카드를 클릭했을 때: 7이면 무늬 선택 창을 띄우고, 아니면 바로 낸다.
-   * @param card - 클릭한 카드
+   * 카드 선택을 토글한다. 낼 수 있는 카드 한 장만 고를 수 있다.
+   * @param card - 토글할 카드
    */
-  const handleCardClick = (card: OneCard): void => {
+  const toggleCard = (card: OneCard): void => {
     if (!isMyTurn || !isLegal(card)) return;
-    if (card.rank === "7") {
-      setPendingSevenId(card.id);
+    setSelectedId((prev) => (prev === card.id ? null : card.id));
+  };
+
+  /** 고른 카드를 낸다. 7이면 무늬를 먼저 고르게 한다. */
+  const handlePlay = (): void => {
+    if (!selectedId) return;
+    if (sortedHand.find((c) => c.id === selectedId)?.rank === "7") {
+      setPickingSuit(true);
       return;
     }
-    onPlayCard(card.id);
+    onPlayCard(selectedId);
+    setSelectedId(null);
   };
 
   /**
@@ -81,8 +96,9 @@ export const OneCardMyHand = ({
    * @param suit - 지정할 무늬
    */
   const handlePickSuit = (suit: Suit): void => {
-    if (pendingSevenId) onPlayCard(pendingSevenId, suit);
-    setPendingSevenId(null);
+    if (selectedId) onPlayCard(selectedId, suit);
+    setSelectedId(null);
+    setPickingSuit(false);
   };
 
   return (
@@ -106,15 +122,23 @@ export const OneCardMyHand = ({
               <PlayingCard
                 key={card.id}
                 card={card}
+                selected={selectedId === card.id}
                 disabled={!isLegal(card)}
-                onClick={isMyTurn ? (): void => handleCardClick(card) : undefined}
+                onClick={isMyTurn ? (): void => toggleCard(card) : undefined}
               />
             ))}
           </CardFan>
         </div>
       </div>
 
-      <div className="flex w-full justify-center">
+      <div className="flex w-full justify-center gap-2">
+        <button
+          onClick={handlePlay}
+          disabled={!isMyTurn || selectedId === null}
+          className="rounded-lg bg-indigo-600 px-6 py-2.5 text-base font-medium transition hover:bg-indigo-500 disabled:opacity-40"
+        >
+          내기
+        </button>
         <button
           onClick={onDraw}
           disabled={!isMyTurn}
@@ -122,12 +146,22 @@ export const OneCardMyHand = ({
         >
           {attackStack > 0 ? `${attackStack}장 먹기` : "카드 먹기"}
         </button>
+        {/* 한 장 남은 사람이 생기면 모두에게 뜬다 — 당사자가 누르면 외치기
+            성공, 다른 사람이 먼저 누르면 지적이 되어 당사자가 벌칙을 받는다. */}
+        {callPending && (
+          <button
+            onClick={onCall}
+            className="rounded-lg bg-amber-500 px-6 py-2.5 text-base font-bold text-amber-950 transition hover:bg-amber-400"
+          >
+            원카드!
+          </button>
+        )}
       </div>
 
-      {pendingSevenId && (
+      {pickingSuit && (
         <SuitPicker
           onPick={handlePickSuit}
-          onCancel={(): void => setPendingSevenId(null)}
+          onCancel={(): void => setPickingSuit(false)}
         />
       )}
     </div>
