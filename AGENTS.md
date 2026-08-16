@@ -49,6 +49,9 @@ src/lib/               외부 클라이언트 인스턴스(Prisma, 소켓)
 3. `server.ts`에 게임별 소켓 이벤트를 추가한다.
 4. `src/constants/games.ts`(로비 목록)와 `rulebook.ts`(방 안 규칙)를 채운다.
 5. `src/components/room/<game>/`에 보드를 만들고 `RoomClient`에서 분기한다.
+6. 게임 종류를 검사하는 곳은 **목록을 새로 적지 말고 `GAMES`에서 파생시킨다**
+   (`GAMES.some((g) => g.id === gameType && !g.disabled)`). 방 생성 API에 지원
+   목록이 따로 박혀 있어 원카드 방이 야찌로 만들어진 적이 있다.
 
 ## 2. 서버·클라이언트 신뢰 경계
 
