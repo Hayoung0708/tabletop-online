@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getOrCreateGuestId } from "@/server/guestAuth";
+import { GAMES } from "@/constants/games";
 import { prisma } from "@/lib/prisma";
 
 const ROOM_CODE_CHARS = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
@@ -11,7 +12,7 @@ const MAX_MAX_PLAYERS = 6;
 const DEFAULT_MAX_PLAYERS = 6;
 const ROOM_NAME_MAX_LENGTH = 20;
 const DEFAULT_ROOM_NAME = "한 판 하실 분";
-const SUPPORTED_GAME_TYPES = ["YATZY", "SHITHEAD"];
+const DEFAULT_GAME_TYPE = "YATZY";
 
 /**
  * 헷갈리기 쉬운 글자(0/O, 1/I 등)를 뺀 문자로 방 코드를 만든다.
@@ -65,9 +66,11 @@ export const POST = async (request: Request): Promise<NextResponse> => {
     MAX_MAX_PLAYERS,
     Math.max(MIN_MAX_PLAYERS, Number(body?.maxPlayers) || DEFAULT_MAX_PLAYERS),
   );
-  const gameType = SUPPORTED_GAME_TYPES.includes(body?.gameType)
+  // 지원 목록은 로비에 노출되는 게임 목록에서 그대로 가져온다 — 여기에 따로
+  // 적어 두면 게임을 추가할 때 빠뜨려 엉뚱한 게임으로 방이 만들어진다.
+  const gameType = GAMES.some((g) => g.id === body?.gameType && !g.disabled)
     ? body.gameType
-    : "YATZY";
+    : DEFAULT_GAME_TYPE;
   const isPrivate = Boolean(body?.isPrivate);
   const name =
     String(body?.name ?? "")
