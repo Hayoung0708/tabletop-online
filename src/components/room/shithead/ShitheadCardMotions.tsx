@@ -15,7 +15,7 @@ import {
   SHITHEAD_DEAL_TOTAL_MS,
   SHITHEAD_ANCHOR,
 } from "@/constants/shithead";
-import type { Card } from "@/server/shithead/deck";
+import type { DisplayCard } from "@/components/room/shithead/PlayingCard";
 
 interface Anchor {
   cx: number;
@@ -27,7 +27,7 @@ interface Flight {
   from: Anchor;
   to: Anchor;
   /** 앞면으로 보여줄 카드. null이면 뒷면(딜 연출). */
-  card: Card | null;
+  card: DisplayCard | null;
   delayMs: number;
   /** 출발 시 기울기(deg). 딜 때 카드를 뿌리는 느낌을 준다. 0이면 회전 없음. */
   tiltDeg: number;
@@ -288,7 +288,13 @@ export const ShitheadCardMotions = (): JSX.Element => {
      * @param root0.playerId - 카드를 낸 플레이어
      * @param root0.cards - 더미로 나간 카드들
      */
-    const onPlay = ({ playerId, cards }: { playerId: string; cards: Card[] }): void => {
+    const onPlay = ({
+      playerId,
+      cards,
+    }: {
+      playerId: string;
+      cards: DisplayCard[];
+    }): void => {
       const fallbackFrom =
         handLanding(playerId) ??
         firstAnchorRect([
@@ -308,7 +314,7 @@ export const ShitheadCardMotions = (): JSX.Element => {
        * @param card - 찾을 카드
        * @returns 카드 중심, 못 찾으면 null
        */
-      const cardFrom = (card: Card): Anchor | null => {
+      const cardFrom = (card: DisplayCard): Anchor | null => {
         const el = fieldEl?.querySelector(`[data-card-id="${card.id}"]`);
         if (!el) return null;
         const rect = el.getBoundingClientRect();
@@ -460,11 +466,15 @@ export const ShitheadCardMotions = (): JSX.Element => {
     socket.on("shithead_pickup", onPickup);
     socket.on("shithead_face_down_to_hand", onFaceDownToHand);
     socket.on("shithead_deal", onDeal);
+    // 원카드도 같은 앵커/오버레이를 그대로 쓴다 — 낸 카드가 손에서 더미로
+    // 날아가는 연출은 게임과 무관하게 동일하다.
+    socket.on("onecard_play", onPlay);
     return (): void => {
       socket.off("shithead_play", onPlay);
       socket.off("shithead_pickup", onPickup);
       socket.off("shithead_face_down_to_hand", onFaceDownToHand);
       socket.off("shithead_deal", onDeal);
+      socket.off("onecard_play", onPlay);
     };
   }, []);
 

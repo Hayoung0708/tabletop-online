@@ -47,6 +47,16 @@ import {
   type PlayResult,
 } from "@/server/shithead/gameLogic";
 import {
+  callOneCard,
+  drawOneCards,
+  finalizeOneCardGameOver,
+  oneCardRankOf,
+  penalizeMissedOneCardCall,
+  playOneCard,
+} from "@/server/onecard/gameLogic";
+import { ONE_CARD_CALL_GRACE_MS } from "@/constants/onecard";
+import type { Suit } from "@/server/shithead/deck";
+import {
   BURN_HOLD_MS,
   CARD_FLIGHT_DURATION_MS,
   FACE_DOWN_FLIP_MS,
@@ -142,6 +152,42 @@ app.prepare().then(() => {
   };
 
   /**
+   * 원카드 게임이 끝났을 때 각 플레이어의 등수를 DB에 반영한다.
+   * @param room - 대상 방 (game.type === "ONECARD")
+   */
+  const persistOneCardResults = async (room: RoomState): Promise<void> => {
+    if (room.game.type !== "ONECARD") return;
+    await Promise.all(
+      room.players.map((p) =>
+        prisma.roomPlayer.update({
+          where: { roomId_playerId: { roomId: room.dbId, playerId: p.userId } },
+          data: { score: oneCardRankOf(room, p.userId) },
+        }),
+      ),
+    );
+    await prisma.room.update({
+      where: { code: room.code },
+      data: { status: "FINISHED", finishedAt: new Date() },
+    });
+  };
+
+  /**
+   * 원카드 게임이 끝났을 때: 마지막 카드 비행/파산 정리 연출이 끝날 때까지
+   * 기다렸다가 결과 화면으로 전환하고 등수를 저장한다.
+   * @param room - 대상 방
+   * @param delay - 결과 화면 전환까지 기다릴 시간(ms)
+   */
+  const scheduleOneCardGameOver = (room: RoomState, delay: number): void => {
+    setTimeout(() => {
+      void (async (): Promise<void> => {
+        finalizeOneCardGameOver(room);
+        await broadcastRoomState(room);
+        await persistOneCardResults(room);
+      })();
+    }, delay);
+  };
+
+  /**
    * 손패/얼굴카드에서 카드를 낸(또는 바닥패를 뒤집어 낸) 뒤 공통으로 해야
    * 하는 뒷일을 예약한다. 손패/더미 갱신은 항상 바로 알린다 — 늦추면 낸
    * 카드가 손패에 남아있다가 갑자기 사라지는 것처럼 보인다. 게임이
@@ -193,6 +239,9 @@ app.prepare().then(() => {
       }, delay);
     }
   };
+
+  // 원카드 외치기 지적이 들어온 방 — 유예 시간 동안 판정을 미뤄 두는 타이머.
+  const missedCallTimers = new Map<string, NodeJS.Timeout>();
 
   const lastPlayerTimers = new Map<string, NodeJS.Timeout>();
 
@@ -586,6 +635,92 @@ app.prepare().then(() => {
       } catch (err) {
         socket.emit("error_message", (err as Error).message);
       }
+    });
+
+    socket.on(
+      "onecard_play",
+      async ({ cardId, suit }: { cardId: string; suit?: Suit }) => {
+        if (!roomCode) return;
+        const code = roomCode;
+        const room = getRoom(code);
+        if (!room) return;
+
+        try {
+          const result = playOneCard(room, socket.data.userId, cardId, suit);
+          // 낸 카드가 손에서 더미로 날아가는 연출용 — 싯헤드와 같은 오버레이를 쓴다.
+          io.to(code).emit("onecard_play", {
+            playerId: socket.data.userId,
+            cards: [result.played],
+          });
+          await broadcastRoomState(room);
+          if (result.gameOver) {
+            scheduleOneCardGameOver(room, cardsFlightMs(1) + GAME_OVER_HOLD_MS);
+          }
+        } catch (err) {
+          socket.emit("error_message", (err as Error).message);
+        }
+      },
+    );
+
+    socket.on("onecard_draw", async () => {
+      if (!roomCode) return;
+      const room = getRoom(roomCode);
+      if (!room) return;
+
+      try {
+        const result = drawOneCards(room, socket.data.userId);
+        // 새 카드가 덱에서 손패로 날아오는 연출은 손패 증가를 감지하는
+        // useHandGrowIn이 처리한다. 여기서는 어떤 소리를 낼지만 미리 알린다
+        // (공격 벌칙이면 더미를 쓸어오는 소리, 아니면 덱에서 뽑는 소리).
+        io.to(roomCode).emit("onecard_draw", {
+          playerId: socket.data.userId,
+          penalty: result.drawn > 1,
+        });
+        await broadcastRoomState(room);
+        if (result.gameOver) {
+          scheduleOneCardGameOver(room, GAME_OVER_HOLD_MS);
+        }
+      } catch (err) {
+        socket.emit("error_message", (err as Error).message);
+      }
+    });
+
+    socket.on("onecard_call", () => {
+      if (!roomCode) return;
+      const code = roomCode;
+      const room = getRoom(code);
+      if (!room || room.game.type !== "ONECARD") return;
+
+      const targetId = room.game.pendingCallPlayerId;
+      if (!targetId) return;
+      const callerId = socket.data.userId;
+
+      // 당사자가 외쳤으면 바로 성공 — 지적 판정을 기다리던 타이머는 외치기가
+      // 이미 풀린 걸 보고 그냥 지나간다.
+      if (callerId === targetId) {
+        callOneCard(room, callerId);
+        io.to(code).emit("onecard_call_result", { playerId: targetId, success: true });
+        void broadcastRoomState(room);
+        return;
+      }
+
+      // 지적은 곧바로 처리하지 않는다 — 거의 동시에 눌렀을 때 당사자가 이기도록
+      // 유예 시간만큼 기다렸다가, 그때까지 안 외쳤으면 벌칙을 준다.
+      if (missedCallTimers.has(code)) return;
+      const timer = setTimeout(() => {
+        missedCallTimers.delete(code);
+        const drawn = penalizeMissedOneCardCall(room, targetId);
+        if (drawn === null) return;
+        io.to(code).emit("onecard_call_result", {
+          playerId: targetId,
+          callerId,
+          success: false,
+        });
+        // 벌칙 카드도 덱에서 날아오는 연출을 쓰되 소리는 여러 장 쓸어오는 소리로.
+        io.to(code).emit("onecard_draw", { playerId: targetId, penalty: true });
+        void broadcastRoomState(room);
+      }, ONE_CARD_CALL_GRACE_MS);
+      missedCallTimers.set(code, timer);
     });
 
     socket.on("emote", ({ emoteId }: { emoteId: string }) => {

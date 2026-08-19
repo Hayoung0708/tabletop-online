@@ -13,6 +13,7 @@ import { Rulebook } from "@/components/room/Rulebook";
 import { LeaveConfirmDialog } from "@/components/room/LeaveConfirmDialog";
 import { YatzyGameBoard } from "@/components/room/yatzy/YatzyGameBoard";
 import { ShitheadGameBoard } from "@/components/room/shithead/ShitheadGameBoard";
+import { OneCardGameBoard } from "@/components/room/onecard/OneCardGameBoard";
 import { ShitheadCardMotions } from "@/components/room/shithead/ShitheadCardMotions";
 import { DealingProvider } from "@/components/room/shithead/DealingContext";
 import { useNicknameJoin } from "@/hooks/useNicknameJoin";
@@ -43,12 +44,21 @@ const buildSidebarExtraLine = (
     return (userId) => `${totals[userId]}점`;
   }
 
+  if (state.game.type === "SHITHEAD") {
+    const { players } = state.game;
+    return (userId) => {
+      const p = players.find((pl) => pl.userId === userId);
+      if (!p) return null;
+      const faceDownLeft = p.faceDown.filter(Boolean).length;
+      return `카드 ${p.handCount + p.faceUp.length + faceDownLeft}장`;
+    };
+  }
+
   const { players } = state.game;
   return (userId) => {
     const p = players.find((pl) => pl.userId === userId);
     if (!p) return null;
-    const faceDownLeft = p.faceDown.filter(Boolean).length;
-    return `카드 ${p.handCount + p.faceUp.length + faceDownLeft}장`;
+    return `카드 ${p.handCount}장`;
   };
 };
 
@@ -145,7 +155,7 @@ export const RoomClient = ({ code, roomName, userId }: RoomClientProps): JSX.Ele
                 )}
 
                 {(state.status === "WAITING" ||
-                  (state.status === "FINISHED" && state.game.type === "SHITHEAD")) && (
+                  (state.status === "FINISHED" && state.game.type !== "YATZY")) && (
                   <WaitingPanel
                     players={state.players}
                     activePlayerCount={activePlayers.length}
@@ -166,6 +176,8 @@ export const RoomClient = ({ code, roomName, userId }: RoomClientProps): JSX.Ele
                       userId={userId}
                       onLeaveRoom={leaveRoom}
                     />
+                  ) : state.game.type === "ONECARD" ? (
+                    <OneCardGameBoard state={state} userId={userId} />
                   ) : (
                     <ShitheadGameBoard state={state} userId={userId} />
                   ))}
@@ -183,7 +195,8 @@ export const RoomClient = ({ code, roomName, userId }: RoomClientProps): JSX.Ele
         </div>
       </DealingProvider>
 
-      {joined && state?.game.type === "SHITHEAD" && <ShitheadCardMotions />}
+      {/* 카드 비행 오버레이는 싯헤드/원카드가 같이 쓴다 (앵커·이벤트 공용). */}
+      {joined && state && state.game.type !== "YATZY" && <ShitheadCardMotions />}
 
       {copied && (
         <div
