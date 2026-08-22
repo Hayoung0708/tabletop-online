@@ -18,11 +18,26 @@ export const RANKS = [
 ] as const;
 export type Rank = (typeof RANKS)[number];
 
+/** 조커를 포함한 카드 랭크. 조커는 혼자 못 내고, 같이 낸 카드의 숫자로 쓴다. */
+export type CardRank = Rank | "JOKER";
+
 export interface Card {
   id: string;
-  rank: Rank;
-  suit: Suit;
+  rank: CardRank;
+  /** 조커는 무늬가 없다(null). */
+  suit: Suit | null;
+  /** 조커를 낼 때 같이 낸 카드의 숫자. 조커가 아니면 없다. */
+  playedAs?: Rank;
 }
+
+/**
+ * 이 카드가 실제로 어떤 숫자로 취급되는지 구한다. 조커는 같이 낸 카드의
+ * 숫자로 대체되고, 아직 내지 않은 조커는 숫자가 없다(null).
+ * @param card - 확인할 카드
+ * @returns 취급되는 랭크, 없으면 null
+ */
+export const effectiveRank = (card: Card): Rank | null =>
+  card.rank === "JOKER" ? (card.playedAs ?? null) : card.rank;
 
 /** 일반 카드(2, 10 제외) 랭크의 오름차순 순서 — 인덱스가 낮을수록 약함 */
 const NORMAL_RANK_ORDER: readonly Rank[] = [
@@ -49,19 +64,25 @@ const BURN_STACK_SIZE = 4;
  * @param rank - 확인할 랭크
  * @returns 와일드 여부
  */
-export const isWildRank = (rank: Rank): boolean =>
+export const isWildRank = (rank: CardRank): boolean =>
   rank === "2" || rank === "7" || rank === "10";
 
 /**
- * 조커 없는 표준 52장 덱을 만든다.
- * @returns 셔플되지 않은 카드 52장
+ * 표준 52장 덱을 만든다. 조커 모드면 조커 2장을 더해 54장으로 만든다
+ * (6인은 1인당 9장이 필요해 54장이어야 시작할 수 있다).
+ * @param withJokers - 조커 2장을 넣을지
+ * @returns 셔플되지 않은 덱
  */
-export const createDeck = (): Card[] => {
+export const createDeck = (withJokers = false): Card[] => {
   const deck: Card[] = [];
   for (const suit of SUITS) {
     for (const rank of RANKS) {
       deck.push({ id: `${rank}-${suit}`, rank, suit });
     }
+  }
+  if (withJokers) {
+    deck.push({ id: "JOKER-1", rank: "JOKER", suit: null });
+    deck.push({ id: "JOKER-2", rank: "JOKER", suit: null });
   }
   return deck;
 };
@@ -106,18 +127,33 @@ const DISPLAY_RANK_ORDER: readonly Rank[] = [
 ];
 
 /**
+ * 조커는 숫자가 없어 항상 맨 오른쪽에 둔다.
+ * @param card
+ */
+const displayRankIndex = (card: Card): number =>
+  card.rank === "JOKER"
+    ? DISPLAY_RANK_ORDER.length
+    : DISPLAY_RANK_ORDER.indexOf(card.rank);
+
+/**
+ * 무늬 정렬값 — 조커는 무늬가 없어 맨 뒤로 보낸다.
+ * @param card
+ */
+const suitOrder = (card: Card): number =>
+  card.suit ? SUIT_STARTING_ORDER[card.suit] : SUITS.length;
+
+/**
  * 손패를 화면에 보여줄 순서로 정렬한다. 랭크가 낮을수록(2가 최저) 왼쪽에
  * 오고, 같은 랭크면 무늬 순(클로버<다이아<하트<스페이드)으로 나열해 매번
- * 같은 배치가 나온다.
+ * 같은 배치가 나온다. 조커는 숫자가 없어 맨 오른쪽에 둔다.
  * @param cards - 정렬할 카드들
  * @returns 정렬된 새 배열 (원본은 바꾸지 않음)
  */
 export const sortHandForDisplay = (cards: readonly Card[]): Card[] =>
   [...cards].sort((a, b) => {
-    const rankDiff =
-      DISPLAY_RANK_ORDER.indexOf(a.rank) - DISPLAY_RANK_ORDER.indexOf(b.rank);
+    const rankDiff = displayRankIndex(a) - displayRankIndex(b);
     if (rankDiff !== 0) return rankDiff;
-    return SUIT_STARTING_ORDER[a.suit] - SUIT_STARTING_ORDER[b.suit];
+    return suitOrder(a) - suitOrder(b);
   });
 
 /**
@@ -128,9 +164,10 @@ export const sortHandForDisplay = (cards: readonly Card[]): Card[] =>
  * @returns a가 더 우선이면 음수, b가 더 우선이면 양수, 같으면 0
  */
 const compareStartingPriority = (a: Card, b: Card): number => {
-  const rankDiff = NORMAL_RANK_ORDER.indexOf(a.rank) - NORMAL_RANK_ORDER.indexOf(b.rank);
+  const rankDiff =
+    NORMAL_RANK_ORDER.indexOf(a.rank as Rank) - NORMAL_RANK_ORDER.indexOf(b.rank as Rank);
   if (rankDiff !== 0) return rankDiff;
-  return SUIT_STARTING_ORDER[a.suit] - SUIT_STARTING_ORDER[b.suit];
+  return suitOrder(a) - suitOrder(b);
 };
 
 /**
@@ -140,7 +177,8 @@ const compareStartingPriority = (a: Card, b: Card): number => {
  * @returns 가장 낮은 카드, 후보(비와일드 카드)가 없으면 null
  */
 const findLowestStartingCard = (cards: readonly Card[]): Card | null => {
-  const candidates = cards.filter((c) => !isWildRank(c.rank));
+  // 조커는 혼자 못 내므로 시작 카드 후보에서도 뺀다.
+  const candidates = cards.filter((c) => c.rank !== "JOKER" && !isWildRank(c.rank));
   if (candidates.length === 0) return null;
   return candidates.reduce((lowest, c) =>
     compareStartingPriority(c, lowest) < 0 ? c : lowest,
@@ -183,8 +221,9 @@ export const findStarterIndex = (playersCards: readonly (readonly Card[])[]): nu
 export const getEffectiveTopCard = (pile: readonly Card[]): Card | null => {
   for (let i = pile.length - 1; i >= 0; i--) {
     const card = pile[i];
-    if (card.rank !== "7") {
-      return card.rank === "2" ? null : card;
+    const rank = effectiveRank(card);
+    if (rank !== "7") {
+      return rank === "2" ? null : card;
     }
   }
   return null;
@@ -197,14 +236,17 @@ export const getEffectiveTopCard = (pile: readonly Card[]): Card | null => {
  * @returns 낼 수 있으면 true
  */
 export const canPlaySingleCard = (pile: readonly Card[], card: Card): boolean => {
+  // 조커는 혼자 낼 수 없다 — 반드시 다른 카드와 같이 내야 한다.
+  if (card.rank === "JOKER") return false;
   if (isWildRank(card.rank)) return true;
 
   const effectiveTop = getEffectiveTopCard(pile);
   if (!effectiveTop) return true;
 
-  return (
-    NORMAL_RANK_ORDER.indexOf(card.rank) >= NORMAL_RANK_ORDER.indexOf(effectiveTop.rank)
-  );
+  const topRank = effectiveRank(effectiveTop);
+  if (!topRank) return true;
+
+  return NORMAL_RANK_ORDER.indexOf(card.rank) >= NORMAL_RANK_ORDER.indexOf(topRank);
 };
 
 /**
@@ -215,7 +257,10 @@ export const canPlaySingleCard = (pile: readonly Card[], card: Card): boolean =>
  */
 export const canPlayCards = (pile: readonly Card[], cards: readonly Card[]): boolean => {
   if (cards.length === 0) return false;
-  const [first, ...rest] = cards;
+  // 조커는 같이 낸 카드의 숫자를 따라가므로, 숫자 비교는 조커를 뺀 카드끼리 한다.
+  const real = cards.filter((c) => c.rank !== "JOKER");
+  if (real.length === 0) return false;
+  const [first, ...rest] = real;
   if (rest.some((c) => c.rank !== first.rank)) return false;
   return canPlaySingleCard(pile, first);
 };
@@ -228,10 +273,11 @@ export const canPlayCards = (pile: readonly Card[], cards: readonly Card[]): boo
  */
 export const shouldBurnPile = (pile: readonly Card[]): boolean => {
   if (pile.length === 0) return false;
-  const topRank = pile[pile.length - 1].rank;
+  // 조커는 같이 낸 숫자로 치므로 4장 태우기에도 그 숫자로 센다.
+  const topRank = effectiveRank(pile[pile.length - 1]);
   if (topRank === "10") return true;
 
   if (pile.length < BURN_STACK_SIZE) return false;
   const topStack = pile.slice(pile.length - BURN_STACK_SIZE);
-  return topStack.every((c) => c.rank === topRank);
+  return topStack.every((c) => effectiveRank(c) === topRank);
 };

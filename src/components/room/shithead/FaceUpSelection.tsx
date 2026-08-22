@@ -17,8 +17,8 @@ export interface FaceUpSelectionProps {
 }
 
 /**
- * 딜 직후 손패 6장 중 바닥패(얼굴카드)로 놓을 3장을 고르는 화면. 다른
- * 플레이어와 같은 레이아웃(바닥패 왼쪽, 손패 오른쪽)을 그대로 써서 고르는
+ * 딜 직후 손패 6장 중 얼굴패로 올려 둘 3장을 고르는 화면. 다른
+ * 플레이어와 같은 레이아웃(바닥패/얼굴패 왼쪽, 손패 오른쪽)을 그대로 써서 고르는
  * 중에도 실제 플레이 화면과 이질감이 없게 한다.
  * @param props - 손패와 확정 콜백
  * @param props.userId
@@ -77,7 +77,7 @@ export const FaceUpSelection = ({
           disabled={selectedIds.length !== FACE_UP_PICK_SIZE}
           className="rounded-lg bg-indigo-600 px-6 py-2.5 text-base font-medium transition hover:bg-indigo-500 disabled:opacity-40"
         >
-          바닥패로 놓기 ({selectedIds.length}/{FACE_UP_PICK_SIZE})
+          얼굴패로 놓기 ({selectedIds.length}/{FACE_UP_PICK_SIZE})
         </button>
       </div>
     </div>

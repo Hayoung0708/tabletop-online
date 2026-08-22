@@ -5,18 +5,24 @@ import type {
   ShitheadGameData,
 } from "@/server/shithead/gameLogic";
 import type { OneCardGameData, PublicOneCardGameState } from "@/server/onecard/gameLogic";
+import type { HulaGameData, PublicHulaGameState } from "@/server/hula/gameLogic";
 
 const MIN_PLAYERS_TO_START = 2;
 
-export type GameData = YatzyGameData | ShitheadGameData | OneCardGameData;
+export type GameData = YatzyGameData | ShitheadGameData | OneCardGameData | HulaGameData;
 export type PublicGameState =
-  PublicYatzyGameState | PublicShitheadGameState | PublicOneCardGameState;
+  | PublicYatzyGameState
+  | PublicShitheadGameState
+  | PublicOneCardGameState
+  | PublicHulaGameState;
 
 export interface PlayerState {
   userId: string;
   nickname: string;
   seat: number;
   connected: boolean;
+  /** 게임 종류와 무관하게 이 게스트가 지금까지 1등한 횟수. */
+  wins: number;
 }
 
 export type RoomStatus = "WAITING" | "PLAYING" | "FINISHED";
@@ -27,6 +33,8 @@ export interface RoomState {
   name: string;
   hostId: string;
   maxPlayers: number;
+  /** 싯헤드 전용 — 조커 2장을 넣은 54장 덱으로 할지. 6인은 이 모드여야 한다. */
+  useJokers: boolean;
   status: RoomStatus;
   players: PlayerState[];
   game: GameData;
@@ -53,6 +61,7 @@ export const getRoom = (code: string): RoomState | undefined => {
  * @param hostId - 방장 게스트 id
  * @param maxPlayers - 최대 인원
  * @param idleGame - 이 방의 게임 종류에 맞는 초기 게임 상태
+ * @param useJokers - 싯헤드 조커(54장) 모드 여부
  * @returns 방 상태
  */
 export const createOrGetRoom = (
@@ -62,6 +71,7 @@ export const createOrGetRoom = (
   hostId: string,
   maxPlayers: number,
   idleGame: GameData,
+  useJokers: boolean,
 ): RoomState => {
   const existing = rooms.get(code);
   if (existing) return existing;
@@ -72,6 +82,7 @@ export const createOrGetRoom = (
     name,
     hostId,
     maxPlayers,
+    useJokers,
     status: "WAITING",
     players: [],
     game: idleGame,
@@ -85,17 +96,20 @@ export const createOrGetRoom = (
  * @param room - 대상 방
  * @param userId - 게스트 id
  * @param nickname - 닉네임
+ * @param wins - 이 게스트의 누적 승수
  * @returns 등록되거나 갱신된 플레이어
  */
 export const addPlayer = (
   room: RoomState,
   userId: string,
   nickname: string,
+  wins: number,
 ): PlayerState => {
   const existing = room.players.find((p) => p.userId === userId);
   if (existing) {
     existing.connected = true;
     existing.nickname = nickname;
+    existing.wins = wins;
     return existing;
   }
 
@@ -103,7 +117,7 @@ export const addPlayer = (
   // 상태에서 나가면 좌석과 충돌한다. 항상 가장 큰 좌석번호+1을 써야 한다.
   const nextSeat = room.players.reduce((max, p) => Math.max(max, p.seat), -1) + 1;
 
-  const player: PlayerState = { userId, nickname, seat: nextSeat, connected: true };
+  const player: PlayerState = { userId, nickname, seat: nextSeat, connected: true, wins };
   room.players.push(player);
   return player;
 };
@@ -214,12 +228,14 @@ export const assertCanStartGame = (
  * @param requesterId - 변경을 요청한 게스트 id
  * @param name - 새 방 제목
  * @param idleGame - 새 게임 종류의 초기 상태
+ * @param useJokers - 싯헤드 조커(54장) 모드 여부
  */
 export const updateRoomSettings = (
   room: RoomState,
   requesterId: string,
   name: string,
   idleGame: GameData,
+  useJokers: boolean,
 ): void => {
   if (room.hostId !== requesterId) throw new Error("호스트만 변경할 수 있습니다.");
   if (room.status === "PLAYING") throw new Error("게임 중에는 변경할 수 없습니다.");
@@ -230,6 +246,7 @@ export const updateRoomSettings = (
 
   room.name = trimmed;
   room.game = idleGame;
+  room.useJokers = useJokers;
   // 게임이 끝난 뒤(FINISHED) 설정을 바꿨으면 새 게임은 비어있는 초기
   // 상태이므로, 대기 화면으로 돌아가야 등수표 같은 낡은 화면이 안 남는다.
   room.status = "WAITING";
@@ -240,6 +257,8 @@ export interface PublicPlayerState {
   nickname: string;
   seat: number;
   connected: boolean;
+  /** 이 게스트의 누적 승수. */
+  wins: number;
 }
 
 export interface PublicRoomState {
@@ -247,6 +266,8 @@ export interface PublicRoomState {
   name: string;
   hostId: string;
   maxPlayers: number;
+  /** 싯헤드 조커(54장) 모드 여부. */
+  useJokers: boolean;
   status: RoomStatus;
   players: PublicPlayerState[];
   game: PublicGameState;
@@ -268,10 +289,12 @@ export const publicRoomState = (
     name: room.name,
     hostId: room.hostId,
     maxPlayers: room.maxPlayers,
+    useJokers: room.useJokers,
     status: room.status,
     players: room.players.map((p) => ({
       userId: p.userId,
       nickname: p.nickname,
+      wins: p.wins,
       seat: p.seat,
       connected: p.connected,
     })),

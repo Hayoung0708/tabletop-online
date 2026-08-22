@@ -1,0 +1,25 @@
+name: deploy
+
+# Render의 자동 배포(On Commit)가 안 걸릴 때를 위한 보험. 저장소 시크릿
+# RENDER_DEPLOY_HOOK에 Render 서비스의 Deploy Hook URL을 넣어두면 master에
+# 푸시될 때마다 배포를 건다. 시크릿이 없으면 아무 일도 하지 않는다.
+on:
+  push:
+    branches: [master]
+  workflow_dispatch:
+
+jobs:
+  trigger:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Render 배포 요청
+        env:
+          DEPLOY_HOOK: ${{ secrets.RENDER_DEPLOY_HOOK }}
+        run: |
+          if [ -z "$DEPLOY_HOOK" ]; then
+            echo "RENDER_DEPLOY_HOOK 시크릿이 없어 건너뜁니다."
+            exit 0
+          fi
+          code=$(curl -s -o /dev/null -w "%{http_code}" --max-time 60 "$DEPLOY_HOOK")
+          echo "deploy hook=$code"
+          test "$code" = "200"

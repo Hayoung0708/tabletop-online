@@ -100,7 +100,17 @@ export const startOneCardGame = (room: RoomState): void => {
   for (const p of room.players) {
     hands[p.userId] = deck.splice(0, dealSize);
   }
-  const opened = deck.splice(0, 1);
+  // 첫 오픈 카드가 공격 카드(2·A·조커)면 시작하는 사람이 아무것도 안 했는데
+  // 공격을 받는 꼴이 된다. 공격 카드는 덱 아래로 돌리고 다른 카드를 깐다.
+  const opened: OneCard[] = [];
+  while (deck.length > 0) {
+    const card = deck.shift() as OneCard;
+    if (attackValueOf(card.rank) === 0) {
+      opened.push(card);
+      break;
+    }
+    deck.push(card);
+  }
 
   room.game = {
     type: "ONECARD",

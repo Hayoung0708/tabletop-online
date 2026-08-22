@@ -12,6 +12,7 @@ export interface DiceTrayProps {
   isMyTurn: boolean;
   hasRolled: boolean;
   isRolling: boolean;
+  isRollPending: boolean;
   onToggleHold: (dieIndex: number) => void;
   onRoll: () => void;
 }
@@ -27,6 +28,7 @@ export interface DiceTrayProps {
  * @param props.isMyTurn
  * @param props.hasRolled
  * @param props.isRolling
+ * @param props.isRollPending
  * @param props.onToggleHold
  * @param props.onRoll
  * @returns 주사위 트레이 엘리먼트
@@ -40,6 +42,7 @@ export const DiceTray = ({
   isMyTurn,
   hasRolled,
   isRolling,
+  isRollPending,
   onToggleHold,
   onRoll,
 }: DiceTrayProps): JSX.Element => {
@@ -61,7 +64,7 @@ export const DiceTray = ({
       </div>
       <button
         onClick={onRoll}
-        disabled={!isMyTurn || rollsLeft <= 0 || isRolling}
+        disabled={!isMyTurn || rollsLeft <= 0 || isRolling || isRollPending}
         className="rounded-lg bg-indigo-600 px-6 py-2.5 text-base font-medium transition hover:bg-indigo-500 disabled:opacity-40"
       >
         주사위 굴리기 ({rollsLeft}/3)

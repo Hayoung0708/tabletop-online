@@ -24,6 +24,12 @@ import {
   publicOneCardGameState,
   startOneCardGame,
 } from "@/server/onecard/gameLogic";
+import {
+  checkHulaLastPlayerStanding,
+  createIdleHulaGame,
+  publicHulaGameState,
+  startHulaGame,
+} from "@/server/hula/gameLogic";
 
 /**
  * gameType 문자열에 맞는, 아직 시작하지 않은 게임 상태를 만든다.
@@ -33,6 +39,7 @@ import {
 export const createIdleGame = (gameType: string): GameData => {
   if (gameType === "SHITHEAD") return createIdleShitheadGame();
   if (gameType === "ONECARD") return createIdleOneCardGame();
+  if (gameType === "HULA") return createIdleHulaGame();
   return createIdleYatzyGame();
 };
 
@@ -49,7 +56,24 @@ export const startGameData = (room: RoomState): void => {
     startOneCardGame(room);
     return;
   }
+  if (room.game.type === "HULA") {
+    startHulaGame(room);
+    return;
+  }
   startYatzyGame(room);
+};
+
+/**
+ * 게임 종류에 맞는 공개 게임 상태를 만든다.
+ * @param room - 대상 방
+ * @param forUserId - 이 상태를 받을 플레이어
+ * @returns 클라이언트용 게임 상태
+ */
+const buildPublicGameState = (room: RoomState, forUserId: string): PublicGameState => {
+  if (room.game.type === "SHITHEAD") return publicShitheadGameState(room, forUserId);
+  if (room.game.type === "ONECARD") return publicOneCardGameState(room, forUserId);
+  if (room.game.type === "HULA") return publicHulaGameState(room, forUserId);
+  return publicYatzyGameState(room);
 };
 
 /**
@@ -63,12 +87,7 @@ export const buildPublicRoomState = (
   room: RoomState,
   forUserId: string,
 ): PublicRoomState => {
-  const game: PublicGameState =
-    room.game.type === "SHITHEAD"
-      ? publicShitheadGameState(room, forUserId)
-      : room.game.type === "ONECARD"
-        ? publicOneCardGameState(room, forUserId)
-        : publicYatzyGameState(room);
+  const game: PublicGameState = buildPublicGameState(room, forUserId);
   return publicRoomState(room, game);
 };
 
@@ -82,5 +101,6 @@ export const checkLastPlayerStanding = (
 ): LastPlayerStandingResult | null => {
   if (room.game.type === "SHITHEAD") return checkShitheadLastPlayerStanding(room);
   if (room.game.type === "ONECARD") return checkOneCardLastPlayerStanding(room);
+  if (room.game.type === "HULA") return checkHulaLastPlayerStanding(room);
   return checkYatzyLastPlayerStanding(room);
 };

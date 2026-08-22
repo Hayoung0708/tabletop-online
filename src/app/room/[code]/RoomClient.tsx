@@ -14,6 +14,7 @@ import { LeaveConfirmDialog } from "@/components/room/LeaveConfirmDialog";
 import { YatzyGameBoard } from "@/components/room/yatzy/YatzyGameBoard";
 import { ShitheadGameBoard } from "@/components/room/shithead/ShitheadGameBoard";
 import { OneCardGameBoard } from "@/components/room/onecard/OneCardGameBoard";
+import { HulaGameBoard } from "@/components/room/hula/HulaGameBoard";
 import { ShitheadCardMotions } from "@/components/room/shithead/ShitheadCardMotions";
 import { DealingProvider } from "@/components/room/shithead/DealingContext";
 import { useNicknameJoin } from "@/hooks/useNicknameJoin";
@@ -163,6 +164,7 @@ export const RoomClient = ({ code, roomName, userId }: RoomClientProps): JSX.Ele
                     isHost={isHost}
                     roomName={state.name}
                     gameType={state.game.type}
+                    useJokers={state.useJokers}
                     winnerUserId={state.game.winnerUserId}
                     onStartGame={startGame}
                     onUpdateRoom={updateRoom}
@@ -178,6 +180,8 @@ export const RoomClient = ({ code, roomName, userId }: RoomClientProps): JSX.Ele
                     />
                   ) : state.game.type === "ONECARD" ? (
                     <OneCardGameBoard state={state} userId={userId} />
+                  ) : state.game.type === "HULA" ? (
+                    <HulaGameBoard state={state} userId={userId} />
                   ) : (
                     <ShitheadGameBoard state={state} userId={userId} />
                   ))}
@@ -195,7 +199,7 @@ export const RoomClient = ({ code, roomName, userId }: RoomClientProps): JSX.Ele
         </div>
       </DealingProvider>
 
-      {/* 카드 비행 오버레이는 싯헤드/원카드가 같이 쓴다 (앵커·이벤트 공용). */}
+      {/* 카드 비행 오버레이는 싯헤드·원카드·훌라가 같이 쓴다 (앵커·이벤트 공용). */}
       {joined && state && state.game.type !== "YATZY" && <ShitheadCardMotions />}
 
       {copied && (

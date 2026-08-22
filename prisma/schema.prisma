@@ -15,6 +15,9 @@ datasource db {
 model Player {
   id        String   @id @default(cuid())
   nickname  String?
+  // Games won across every game type, kept on the guest id so it survives
+  // switching games and rejoining rooms.
+  wins      Int      @default(0)
   createdAt DateTime @default(now())
 
   roomPlayers RoomPlayer[]
@@ -32,6 +35,8 @@ model Room {
   status     String    @default("WAITING") // WAITING | PLAYING | FINISHED
   hostId     String
   maxPlayers Int       @default(4)
+  // Shithead only: play with the 54-card deck (two jokers). Required for 6 players.
+  useJokers  Boolean   @default(false)
   createdAt  DateTime  @default(now())
   finishedAt DateTime?
 

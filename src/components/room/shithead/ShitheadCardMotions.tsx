@@ -469,12 +469,15 @@ export const ShitheadCardMotions = (): JSX.Element => {
     // 원카드도 같은 앵커/오버레이를 그대로 쓴다 — 낸 카드가 손에서 더미로
     // 날아가는 연출은 게임과 무관하게 동일하다.
     socket.on("onecard_play", onPlay);
+    // 훌라는 버리는 카드가 같은 앵커(버림더미)로 날아간다.
+    socket.on("hula_discard", onPlay);
     return (): void => {
       socket.off("shithead_play", onPlay);
       socket.off("shithead_pickup", onPickup);
       socket.off("shithead_face_down_to_hand", onFaceDownToHand);
       socket.off("shithead_deal", onDeal);
       socket.off("onecard_play", onPlay);
+      socket.off("hula_discard", onPlay);
     };
   }, []);
 

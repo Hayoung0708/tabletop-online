@@ -1,6 +1,7 @@
 import type { RoomState } from "@/server/roomManager";
 import {
   type Card,
+  type Rank,
   canPlayCards,
   canPlaySingleCard,
   createDeck,
@@ -18,6 +19,8 @@ export interface ShitheadGameData {
   type: "SHITHEAD";
   deck: Card[];
   pile: Card[];
+  /** 가장 최근 한 번에 낸 장수. 더미 hover에서 몇 장을 펼칠지 정하는 데 쓴다. */
+  lastPlayedCount: number;
   currentPlayerIndex: number;
   winnerUserId: string | null;
   finishedOrder: string[];
@@ -41,6 +44,7 @@ export const createIdleShitheadGame = (): ShitheadGameData => ({
   type: "SHITHEAD",
   deck: [],
   pile: [],
+  lastPlayedCount: 0,
   currentPlayerIndex: 0,
   winnerUserId: null,
   finishedOrder: [],
@@ -71,7 +75,8 @@ const asShitheadGame = (room: RoomState): ShitheadGameData => {
  * @param room - 대상 방
  */
 export const startShitheadGame = (room: RoomState): void => {
-  const deck = shuffleCards(createDeck());
+  // 6인은 1인당 9장이라 54장(조커 2장 포함)이어야 나눠줄 수 있다.
+  const deck = shuffleCards(createDeck(room.useJokers));
   const hands: Record<string, Card[]> = {};
   const faceUp: Record<string, Card[]> = {};
   const faceDown: Record<string, (Card | null)[]> = {};
@@ -90,6 +95,7 @@ export const startShitheadGame = (room: RoomState): void => {
     type: "SHITHEAD",
     deck,
     pile: [],
+    lastPlayedCount: 0,
     currentPlayerIndex: starterIndex >= 0 ? starterIndex : 0,
     winnerUserId: null,
     finishedOrder: [],
@@ -286,6 +292,7 @@ export const burnPile = (room: RoomState): Card[] => {
   const game = asShitheadGame(room);
   const burned = [...game.pile];
   game.pile = [];
+  game.lastPlayedCount = 0;
   return burned;
 };
 
@@ -346,11 +353,14 @@ export const playFromHandOrFaceUp = (
 
   if (!canPlayCards(game.pile, selected)) throw new Error("낼 수 없는 카드입니다.");
 
+  // 조커는 같이 낸 카드의 숫자로 취급한다 — 더미 기준/4장 태우기 모두 그 숫자로 센다.
+  const playedRank = selected.find((c) => c.rank !== "JOKER")?.rank as Rank;
   for (const card of selected) {
     const idx = zone.indexOf(card);
     zone.splice(idx, 1);
-    game.pile.push(card);
+    game.pile.push(card.rank === "JOKER" ? { ...card, playedAs: playedRank } : card);
   }
+  game.lastPlayedCount = selected.length;
 
   // 손패에서 냈고 덱에 남은 카드가 있으면 다시 3장이 되도록 채워야 하지만,
   // 실제로 손패에 넣는 건 재정렬 연출이 끝난 뒤 server.ts가 applyPendingRefill로
@@ -412,6 +422,7 @@ export const commitFaceDownPlay = (
   const card = game.faceDown[requesterId][index] as Card;
   game.faceDown[requesterId][index] = null;
   game.pile.push(card);
+  game.lastPlayedCount = 1;
   return resolveAfterPlay(room, game, requesterId, [card], 0);
 };
 
@@ -445,6 +456,7 @@ export const commitFaceDownPickup = (room: RoomState, requesterId: string): numb
   const pickedUp = game.pile.length;
   game.hands[requesterId].push(...game.pile);
   game.pile = [];
+  game.lastPlayedCount = 0;
   game.currentPlayerIndex = findNextActiveIndex(room, game, game.currentPlayerIndex);
   return pickedUp;
 };
@@ -522,6 +534,8 @@ export interface PublicShitheadPlayer {
 export interface PublicShitheadGameState {
   type: "SHITHEAD";
   pile: Card[];
+  /** 가장 최근 한 번에 낸 장수 (더미 hover 펼침용). */
+  lastPlayedCount: number;
   deckCount: number;
   currentPlayerId: string | null;
   winnerUserId: string | null;
@@ -546,6 +560,7 @@ export const publicShitheadGameState = (
   return {
     type: "SHITHEAD",
     pile: game.pile,
+    lastPlayedCount: game.lastPlayedCount,
     deckCount: game.deck.length,
     currentPlayerId: allSelected ? currentPlayerId(room, game) : null,
     winnerUserId: game.winnerUserId,

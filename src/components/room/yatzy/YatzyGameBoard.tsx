@@ -29,9 +29,11 @@ export const YatzyGameBoard = ({
   userId,
   onLeaveRoom,
 }: YatzyGameBoardProps): JSX.Element | null => {
-  const { rollDice, toggleHold, scoreCategory } = useYatzyActions();
-  const { celebrations, addCelebration, removeCelebration } = useYahtzeeCelebrations();
   const game = state.game.type === "YATZY" ? state.game : null;
+  const { rollDice, toggleHold, scoreCategory, isRollPending } = useYatzyActions(
+    game?.rollsLeft ?? 0,
+  );
+  const { celebrations, addCelebration, removeCelebration } = useYahtzeeCelebrations();
   const { rollingMask, randomFaces, isRolling } = useDiceRollAnimation(
     game,
     addCelebration,
@@ -55,6 +57,7 @@ export const YatzyGameBoard = ({
           isMyTurn={isMyTurn}
           hasRolled={hasRolled}
           isRolling={isRolling}
+          isRollPending={isRollPending}
           onToggleHold={toggleHold}
           onRoll={rollDice}
         />

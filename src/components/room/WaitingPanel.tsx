@@ -3,7 +3,10 @@
 import { useState, type JSX } from "react";
 import { GAMES } from "@/constants/games";
 import { ROOM_NAME_MAX_LENGTH } from "@/constants/app";
-import { SHITHEAD_MAX_PLAYERS } from "@/constants/shithead";
+import {
+  SHITHEAD_MAX_PLAYERS,
+  SHITHEAD_MAX_PLAYERS_WITH_JOKERS,
+} from "@/constants/shithead";
 import type { PublicRoomState } from "@/server/roomManager";
 
 const MIN_PLAYERS_TO_START = 2;
@@ -15,9 +18,11 @@ export interface WaitingPanelProps {
   isHost: boolean;
   roomName: string;
   gameType: string;
+  /** 싯헤드 조커(54장) 모드가 켜져 있는지. */
+  useJokers: boolean;
   winnerUserId: string | null;
   onStartGame: () => void;
-  onUpdateRoom: (name: string, gameType: string) => void;
+  onUpdateRoom: (name: string, gameType: string, useJokers: boolean) => void;
 }
 
 /**
@@ -30,6 +35,7 @@ export interface WaitingPanelProps {
  * @param props.isHost
  * @param props.roomName
  * @param props.gameType
+ * @param props.useJokers
  * @param props.winnerUserId
  * @param props.onStartGame
  * @param props.onUpdateRoom
@@ -42,30 +48,35 @@ export const WaitingPanel = ({
   isHost,
   roomName,
   gameType,
+  useJokers,
   winnerUserId,
   onStartGame,
   onUpdateRoom,
 }: WaitingPanelProps): JSX.Element => {
   const winnerNickname = players.find((p) => p.userId === winnerUserId)?.nickname ?? "-";
-  // 싯헤드는 52장 덱 한계로 5명까지만 시작할 수 있다(방 정원 6명과는 별개).
-  const tooManyForGame =
-    gameType === "SHITHEAD" && activePlayerCount > SHITHEAD_MAX_PLAYERS;
+  // 싯헤드는 덱 한계로 인원이 막힌다 — 52장이면 5명, 조커를 넣은 54장이면 6명.
+  const shitheadLimit = useJokers
+    ? SHITHEAD_MAX_PLAYERS_WITH_JOKERS
+    : SHITHEAD_MAX_PLAYERS;
+  const tooManyForGame = gameType === "SHITHEAD" && activePlayerCount > shitheadLimit;
   const canStart = activePlayerCount >= MIN_PLAYERS_TO_START && !tooManyForGame;
 
   const [editing, setEditing] = useState(false);
   const [nameDraft, setNameDraft] = useState(roomName);
   const [gameDraft, setGameDraft] = useState(gameType);
+  const [jokerDraft, setJokerDraft] = useState(useJokers);
 
   /** 변경 폼을 현재 값으로 초기화해서 연다. */
   const openEdit = (): void => {
     setNameDraft(roomName);
     setGameDraft(gameType);
+    setJokerDraft(useJokers);
     setEditing(true);
   };
 
   /** 변경 내용을 서버에 보내고 폼을 닫는다. */
   const saveEdit = (): void => {
-    onUpdateRoom(nameDraft, gameDraft);
+    onUpdateRoom(nameDraft, gameDraft, jokerDraft);
     setEditing(false);
   };
 
@@ -81,7 +92,8 @@ export const WaitingPanel = ({
       </p>
       {tooManyForGame && (
         <p className="mt-2 text-sm text-amber-400">
-          싯헤드는 최대 {SHITHEAD_MAX_PLAYERS}명까지 플레이할 수 있습니다
+          싯헤드는 이 설정에서 최대 {shitheadLimit}명까지 플레이할 수 있습니다
+          {!useJokers && " (조커 모드로 바꾸면 6명까지 가능)"}
         </p>
       )}
 
@@ -124,6 +136,23 @@ export const WaitingPanel = ({
               ))}
             </div>
           </div>
+          {gameDraft === "SHITHEAD" && (
+            <label className="flex items-start gap-2 rounded-lg border border-slate-700 bg-slate-900 px-3 py-2">
+              <input
+                type="checkbox"
+                checked={jokerDraft}
+                onChange={(e): void => setJokerDraft(e.target.checked)}
+                className="mt-1 h-4 w-4 accent-indigo-500"
+              />
+              <span className="flex flex-col">
+                <span className="text-base">조커 포함 (54장)</span>
+                <span className="text-sm text-slate-400">
+                  6명이 하려면 켜야 합니다. 조커는 혼자 못 내고 같이 낸 카드의 숫자로
+                  쓰입니다.
+                </span>
+              </span>
+            </label>
+          )}
           <div className="flex justify-end gap-2">
             <button
               onClick={(): void => setEditing(false)}
