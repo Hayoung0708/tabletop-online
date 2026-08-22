@@ -8,6 +8,7 @@ import {
   totalScore,
 } from "@/utils/yatzy";
 import type { RoomState } from "@/server/roomManager";
+import { YATZY_ROLL_COOLDOWN_MS } from "@/constants/yatzy";
 
 const TOTAL_TURNS = CATEGORIES.length;
 const INITIAL_DICE = [1, 1, 1, 1, 1];
@@ -18,6 +19,8 @@ export interface YatzyGameData {
   dice: number[];
   held: boolean[];
   rollsLeft: number;
+  /** 이번 턴에 마지막으로 굴린 시각. 연타 쿨다운 판정용 */
+  lastRolledAt: number | null;
   currentPlayerIndex: number;
   winnerUserId: string | null;
   scorecards: Record<string, Scorecard>;
@@ -33,6 +36,7 @@ export const createIdleYatzyGame = (): YatzyGameData => ({
   dice: [...INITIAL_DICE],
   held: [...INITIAL_HELD],
   rollsLeft: 3,
+  lastRolledAt: null,
   currentPlayerIndex: 0,
   winnerUserId: null,
   scorecards: {},
@@ -57,6 +61,7 @@ export const startYatzyGame = (room: RoomState): void => {
     dice: [...INITIAL_DICE],
     held: [...INITIAL_HELD],
     rollsLeft: 3,
+    lastRolledAt: null,
     currentPlayerIndex: 0,
     winnerUserId: null,
     scorecards,
@@ -98,6 +103,10 @@ const assertTurn = (room: RoomState, requesterId: string): void => {
 
 /**
  * 주사위를 굴린다. 홀드된 주사위는 그대로 두고 나머지만 다시 굴린다.
+ *
+ * 쿨다운 안에 다시 들어온 요청은 연타·마우스 채터링으로 보고 조용히 무시한다.
+ * 클라이언트가 정상이라면 여기까지 올 수 없는 요청이므로, 사용자에게 에러는
+ * 보이지 않되 서버 로그에는 남겨 앞 단계 잠금이 뚫렸다는 흔적을 남긴다.
  * @param room - 대상 방
  * @param requesterId - 요청한 게스트 id
  */
@@ -105,6 +114,17 @@ export const rollDiceForRoom = (room: RoomState, requesterId: string): void => {
   assertTurn(room, requesterId);
   const game = asYatzyGame(room);
   if (game.rollsLeft <= 0) throw new Error("더 이상 굴릴 수 없습니다.");
+
+  const now = Date.now();
+  const sinceLastRoll = game.lastRolledAt === null ? null : now - game.lastRolledAt;
+  if (sinceLastRoll !== null && sinceLastRoll < YATZY_ROLL_COOLDOWN_MS) {
+    console.warn(
+      `[yatzy] 굴리기 중복 요청 무시: room=${room.code} user=${requesterId} ` +
+        `interval=${sinceLastRoll}ms rollsLeft=${game.rollsLeft}`,
+    );
+    return;
+  }
+  game.lastRolledAt = now;
 
   const fresh = rollDice(5);
   game.dice = game.dice.map((v, i) => (game.held[i] ? v : fresh[i]));
@@ -170,6 +190,7 @@ export const scoreCategory = (
   game.dice = [...INITIAL_DICE];
   game.held = [...INITIAL_HELD];
   game.rollsLeft = 3;
+  game.lastRolledAt = null;
 
   // 야찌는 정확히 13턴제라, 반복 야찌를 쌓는 턴도 턴 수에 포함된다. 그래서
   // 항목이 남은 채로 턴이 끝날 수 있는데, 그런 항목은 0점으로 채워 게임이
