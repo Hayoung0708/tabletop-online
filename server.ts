@@ -161,11 +161,13 @@ app.prepare().then(() => {
       data: { status: "FINISHED", finishedAt: new Date() },
     });
 
-    // 야찌는 총점이 가장 높은 사람이 1등이다.
+    // 야찌는 총점이 가장 높은 사람이 1등이다. 다만 아무도 점수를 못 낸 판은
+    // 실제로 진행된 게임이 아니므로 승수를 주지 않는다 — 안 그러면 좌석
+    // 순서상 맨 앞(대개 방장)이 공짜로 1승을 가져간다.
     const [best] = [...room.players].sort(
       (a, b) => (totals[b.userId] ?? 0) - (totals[a.userId] ?? 0),
     );
-    if (best) await awardWin(room, best.userId);
+    if (best && (totals[best.userId] ?? 0) > 0) await awardWin(room, best.userId);
   };
 
   /**
