@@ -9,7 +9,7 @@ import { RoomHeader } from "@/components/room/RoomHeader";
 import { NicknameForm } from "@/components/room/NicknameForm";
 import { PlayerSidebar } from "@/components/room/PlayerSidebar";
 import { WaitingPanel } from "@/components/room/WaitingPanel";
-import { Rulebook } from "@/components/room/Rulebook";
+import { Rulebook, RulebookAccordion } from "@/components/room/Rulebook";
 import { LeaveConfirmDialog } from "@/components/room/LeaveConfirmDialog";
 import { YatzyGameBoard } from "@/components/room/yatzy/YatzyGameBoard";
 import { ShitheadGameBoard } from "@/components/room/shithead/ShitheadGameBoard";
@@ -115,7 +115,7 @@ export const RoomClient = ({ code, roomName, userId }: RoomClientProps): JSX.Ele
       <AdRail side="right" />
 
       <DealingProvider>
-        <div className="flex min-h-0 flex-1 justify-center overflow-hidden">
+        <div className="flex min-h-0 flex-1 flex-col overflow-hidden lg:flex-row lg:justify-center">
           {joined && state && (
             <PlayerSidebar
               players={state.players}
@@ -146,7 +146,24 @@ export const RoomClient = ({ code, roomName, userId }: RoomClientProps): JSX.Ele
                 joinError={joinError}
               />
             ) : !state ? (
-              <p className="text-slate-400">방에 연결하는 중...</p>
+              // 연결이 막힌 이유(참가 기록 정리 등)를 여기서도 보여준다 —
+              // 안 그러면 원인 없이 "연결하는 중"만 영영 떠 있는다.
+              <div className="flex flex-col items-start gap-2">
+                <p className="text-slate-400">방에 연결하는 중...</p>
+                {error && (
+                  <>
+                    <p className="rounded-md bg-red-950 px-4 py-2 text-sm text-red-300">
+                      {error}
+                    </p>
+                    <button
+                      onClick={(): void => void joinRoom(nickname)}
+                      className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium transition hover:bg-indigo-500"
+                    >
+                      다시 시도
+                    </button>
+                  </>
+                )}
+              </div>
             ) : (
               <>
                 {error && (
@@ -155,8 +172,7 @@ export const RoomClient = ({ code, roomName, userId }: RoomClientProps): JSX.Ele
                   </p>
                 )}
 
-                {(state.status === "WAITING" ||
-                  (state.status === "FINISHED" && state.game.type !== "YATZY")) && (
+                {(state.status === "WAITING" || state.status === "FINISHED") && (
                   <WaitingPanel
                     players={state.players}
                     activePlayerCount={activePlayers.length}
@@ -165,7 +181,11 @@ export const RoomClient = ({ code, roomName, userId }: RoomClientProps): JSX.Ele
                     roomName={state.name}
                     gameType={state.game.type}
                     useJokers={state.useJokers}
-                    winnerUserId={state.game.winnerUserId}
+                    // 혼자 남아 이긴 경우에만 방이 WAITING으로 되돌아온다 —
+                    // 정상 종료(FINISHED)에는 안내를 띄우지 않는다.
+                    abandonedWinnerUserId={
+                      state.status === "WAITING" ? state.game.winnerUserId : null
+                    }
                     onStartGame={startGame}
                     onUpdateRoom={updateRoom}
                   />
@@ -173,11 +193,7 @@ export const RoomClient = ({ code, roomName, userId }: RoomClientProps): JSX.Ele
 
                 {(state.status === "PLAYING" || state.status === "FINISHED") &&
                   (state.game.type === "YATZY" ? (
-                    <YatzyGameBoard
-                      state={state}
-                      userId={userId}
-                      onLeaveRoom={leaveRoom}
-                    />
+                    <YatzyGameBoard state={state} userId={userId} />
                   ) : state.game.type === "ONECARD" ? (
                     <OneCardGameBoard state={state} userId={userId} />
                   ) : state.game.type === "HULA" ? (
@@ -191,6 +207,9 @@ export const RoomClient = ({ code, roomName, userId }: RoomClientProps): JSX.Ele
                     이 방의 참가자가 아닙니다. 로비에서 참가해주세요.
                   </p>
                 )}
+
+                {/* 좁은 화면에는 오른쪽 룰북 자리가 없어 게임판 아래에 접어 둔다. */}
+                <RulebookAccordion gameType={state.game.type} />
               </>
             )}
           </main>

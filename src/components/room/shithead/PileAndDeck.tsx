@@ -110,7 +110,7 @@ export const PileAndDeck = ({
   }, [burningCard]);
 
   return (
-    <div className="flex items-start justify-center gap-6 py-4">
+    <div className="flex items-start justify-center gap-4 py-3 sm:gap-6 sm:py-4">
       <div className="flex flex-col items-center gap-1.5">
         <div data-anchor={SHITHEAD_ANCHOR.deck}>
           {deckCount > 0 ? (

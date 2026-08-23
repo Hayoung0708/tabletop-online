@@ -13,7 +13,6 @@ import type { PublicRoomState } from "@/server/roomManager";
 export interface YatzyGameBoardProps {
   state: PublicRoomState;
   userId: string;
-  onLeaveRoom: () => void;
 }
 
 /**
@@ -21,13 +20,11 @@ export interface YatzyGameBoardProps {
  * @param props - 방 상태, 내 게스트 id, 나가기 핸들러
  * @param props.state
  * @param props.userId
- * @param props.onLeaveRoom
  * @returns 야찌 게임판 엘리먼트, 야찌 방이 아니면 null
  */
 export const YatzyGameBoard = ({
   state,
   userId,
-  onLeaveRoom,
 }: YatzyGameBoardProps): JSX.Element | null => {
   const game = state.game.type === "YATZY" ? state.game : null;
   const { rollDice, toggleHold, scoreCategory, isRollPending } = useYatzyActions(
@@ -64,11 +61,7 @@ export const YatzyGameBoard = ({
       )}
 
       {state.status === "FINISHED" && (
-        <FinishedPanel
-          players={state.players}
-          totals={game.totals}
-          onLeaveRoom={onLeaveRoom}
-        />
+        <FinishedPanel players={state.players} totals={game.totals} />
       )}
 
       <Scoreboard

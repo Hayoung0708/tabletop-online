@@ -22,22 +22,27 @@ export const cardsFlightMs = (count: number): number =>
  * 그만큼만 겹친다(간격이 카드폭보다 좁아짐). 카드가 적으면 기본 간격으로 벌린다.
  * @param count - 손패 카드 수
  * @param availableWidth - 손패 영역의 실제 폭(px)
+ * @param cardWidth - 카드 한 장의 실제 폭(px)
  * @returns 카드 간 간격(px). 카드폭보다 작으면 그 차이만큼 겹친다.
  */
-const restStep = (count: number, availableWidth: number): number => {
-  const maxStep = HAND_CARD_WIDTH_PX + HAND_CARD_GAP_PX;
+const restStep = (count: number, availableWidth: number, cardWidth: number): number => {
+  const maxStep = cardWidth + HAND_CARD_GAP_PX;
   if (count <= 1 || availableWidth <= 0) return maxStep;
-  return Math.min(maxStep, (availableWidth - HAND_CARD_WIDTH_PX) / (count - 1));
+  return Math.min(maxStep, (availableWidth - cardWidth) / (count - 1));
 };
 
 /**
  * 쉬는 상태에서 각 카드에 적용할 왼쪽 마진(px). 겹칠 때는 음수, 여유 있으면 기본 간격.
  * @param count - 손패 카드 수
  * @param availableWidth - 손패 영역의 실제 폭(px)
+ * @param cardWidth - 카드 한 장의 실제 폭(px). 화면 폭에 따라 달라져서 재서 넘긴다
  * @returns 왼쪽 마진(px)
  */
-export const computeHandMargin = (count: number, availableWidth: number): number =>
-  restStep(count, availableWidth) - HAND_CARD_WIDTH_PX;
+export const computeHandMargin = (
+  count: number,
+  availableWidth: number,
+  cardWidth: number = HAND_CARD_WIDTH_PX,
+): number => restStep(count, availableWidth, cardWidth) - cardWidth;
 
 /**
  * 특정 카드에 hover했을 때 각 카드의 가로 이동량(px) 배열을 구한다. hover 카드의
@@ -49,18 +54,19 @@ export const computeHandMargin = (count: number, availableWidth: number): number
  * @param count - 손패 카드 수
  * @param availableWidth - 손패 영역의 실제 폭(px)
  * @param hoveredIndex - hover한 카드 인덱스. null이면 전부 0
+ * @param cardWidth - 카드 한 장의 실제 폭(px)
  * @returns 카드별 translateX(px) 배열(길이 count). hover 카드 자신도 왼쪽으로 밀릴 수 있다.
  */
 export const computeFanHoverShifts = (
   count: number,
   availableWidth: number,
   hoveredIndex: number | null,
+  cardWidth: number,
 ): number[] => {
   const shifts = new Array<number>(count).fill(0);
   if (hoveredIndex === null || count <= 1 || availableWidth <= 0) return shifts;
 
-  const cardWidth = HAND_CARD_WIDTH_PX;
-  const step = restStep(count, availableWidth);
+  const step = restStep(count, availableWidth, cardWidth);
   const revealStep = REVEAL_RATIO * cardWidth;
   const followerCount = count - 1 - hoveredIndex;
   // 이미 3/4 이상 보이거나 hover 카드가 마지막이면 밀 필요 없음.

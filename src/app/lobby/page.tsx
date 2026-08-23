@@ -10,7 +10,7 @@ const LobbyPage = (): JSX.Element => {
   return (
     <>
       <SiteHeader />
-      <main className="mx-auto flex w-full max-w-2xl min-h-0 flex-1 flex-col gap-8 overflow-y-auto px-6 py-8">
+      <main className="mx-auto flex w-full max-w-2xl min-h-0 flex-1 flex-col gap-6 overflow-y-auto px-4 py-6 sm:gap-8 sm:px-6 sm:py-8">
         <LobbyClient />
       </main>
     </>

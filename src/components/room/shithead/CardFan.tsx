@@ -1,12 +1,19 @@
 "use client";
 
-import { Children, useState, type CSSProperties, type JSX, type ReactNode } from "react";
-import { useMeasuredWidth } from "@/hooks/useMeasuredWidth";
+import {
+  Children,
+  useRef,
+  useState,
+  type CSSProperties,
+  type JSX,
+  type ReactNode,
+} from "react";
 import { useDealing } from "@/components/room/shithead/DealingContext";
 import { useHandDealIn } from "@/hooks/shithead/useHandDealIn";
 import { useHandDealInOnMount } from "@/hooks/shithead/useHandDealInOnMount";
 import { useHandGrowIn } from "@/hooks/shithead/useHandGrowIn";
 import { useHandDragReorder } from "@/hooks/shithead/useHandDragReorder";
+import { useHandMetrics } from "@/hooks/shithead/useHandMetrics";
 import { computeFanHoverShifts, computeHandMargin } from "@/utils/shithead";
 
 /** hover한 카드가 살짝 떠오르는 높이(px). */
@@ -58,15 +65,18 @@ export const CardFan = ({
   dealInOnMount = false,
   onReorder,
 }: CardFanProps): JSX.Element => {
-  const [ref, width] = useMeasuredWidth<HTMLDivElement>();
+  const ref = useRef<HTMLDivElement>(null);
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
   const drag = useHandDragReorder(ref, cardKeys ?? [], onReorder);
   const dealing = useDealing();
   const flying = useHandDealIn(ref, dealInOnStart);
   useHandDealInOnMount(ref, dealInOnMount);
   const cards = Children.toArray(children);
-  const marginPx = computeHandMargin(cards.length, width);
-  const shifts = computeFanHoverShifts(cards.length, width, hoveredIndex);
+  // 카드 폭은 화면 크기에 따라 달라진다(모바일 56px / 데스크톱 64px). 상수로
+  // 두면 계산이 어긋나 공간이 남는데도 카드가 겹치거나 오른쪽이 빈다.
+  const { width, cardWidth } = useHandMetrics(ref, cards.length);
+  const marginPx = computeHandMargin(cards.length, width, cardWidth);
+  const shifts = computeFanHoverShifts(cards.length, width, hoveredIndex, cardWidth);
 
   // 새로 들어온 카드는 실제 카드 엘리먼트가 직접 날아온다 — 오버레이 사본을
   // 쓰지 않으므로 같은 카드가 두 장으로 보일 일이 없다.

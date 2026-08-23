@@ -1,13 +1,26 @@
 "use client";
 
-import { useRef, type JSX } from "react";
+import { useRef, type CSSProperties, type JSX } from "react";
 import { PlayingCard } from "@/components/room/shithead/PlayingCard";
 import { useHandGrowIn } from "@/hooks/shithead/useHandGrowIn";
 import { useHandDealInOnMount } from "@/hooks/shithead/useHandDealInOnMount";
 import { useMeasuredWidth } from "@/hooks/useMeasuredWidth";
 import { SHITHEAD_ANCHOR } from "@/constants/shithead";
 import { computeHandMargin } from "@/utils/shithead";
+import { HULA_REVEAL_DURATION_MS, HULA_REVEAL_STAGGER_MS } from "@/constants/hula";
 import type { PublicHulaPlayer } from "@/server/hula/gameLogic";
+
+/**
+ * 공개된 손패 한 장을 뒤집는 연출 스타일. 카드마다 조금씩 늦게 뒤집혀
+ * 왼쪽부터 차례로 넘어가는 것처럼 보인다.
+ * @param index - 손패에서 몇 번째 카드인지
+ * @returns 인라인 스타일
+ */
+const revealStyle = (index: number): CSSProperties => ({
+  animationDelay: `${index * HULA_REVEAL_STAGGER_MS}ms`,
+  // animate.css는 재생 시간을 이 변수로 받는다.
+  ["--animate-duration" as string]: `${HULA_REVEAL_DURATION_MS}ms`,
+});
 
 export interface HulaOpponentRowProps {
   nickname: string;
@@ -42,16 +55,19 @@ export const HulaOpponentRow = ({
   const handKeys = Array.from({ length: player.handCount }, (_, i) =>
     String(player.handCount - i),
   );
+  // 판이 끝나면 서버가 상대 손패를 실제 카드로 내려준다 — 그때는 뒷면 대신
+  // 카드를 뒤집는 연출로 보여준다.
+  const revealedHand = player.hand;
   useHandGrowIn(handRef, handKeys, player.userId, true);
   const handMarginPx = computeHandMargin(handKeys.length, handWidth);
 
   return (
     <div
-      className={`flex flex-col gap-2 rounded-lg border px-3 pt-2 pb-4 ${
+      className={`flex flex-col gap-1.5 rounded-lg border px-2 pt-2 pb-3 sm:gap-2 sm:px-3 sm:pb-4 ${
         isCurrentTurn ? "border-indigo-500 bg-indigo-950/40" : "border-slate-800"
       }`}
     >
-      <div className="flex items-center gap-2 text-lg font-semibold text-slate-200">
+      <div className="flex items-center gap-2 text-base font-semibold text-slate-200 sm:text-lg">
         <span className="truncate">{nickname}</span>
         {player.registered && (
           <span className="rounded bg-emerald-900 px-1.5 py-0.5 text-xs font-medium text-emerald-300">
@@ -70,17 +86,31 @@ export const HulaOpponentRow = ({
           ref={handRef}
           data-anchor={SHITHEAD_ANCHOR.hand(player.userId)}
           data-hand-align="start"
-          className="relative z-50 flex min-h-[5.625rem] min-w-0 flex-1 sm:min-h-[6.625rem]"
+          // 공개된 손패는 겹치면 숫자가 가려 확인할 수 없다 — 겹침을 풀고
+          // 줄바꿈으로 전부 보여준다.
+          className={`relative z-50 flex min-h-[5.625rem] min-w-0 flex-1 sm:min-h-[6.625rem] ${
+            revealedHand ? "flex-wrap gap-1" : ""
+          }`}
         >
-          {handKeys.map((key, index) => (
-            <div
-              key={key}
-              className="relative"
-              style={{ marginLeft: index === 0 ? 0 : handMarginPx }}
-            >
-              <PlayingCard faceDown />
-            </div>
-          ))}
+          {revealedHand
+            ? revealedHand.map((card, index) => (
+                <div
+                  key={card.id}
+                  className="animate__animated animate__flipInY relative"
+                  style={revealStyle(index)}
+                >
+                  <PlayingCard card={card} />
+                </div>
+              ))
+            : handKeys.map((key, index) => (
+                <div
+                  key={key}
+                  className="relative"
+                  style={{ marginLeft: index === 0 ? 0 : handMarginPx }}
+                >
+                  <PlayingCard faceDown />
+                </div>
+              ))}
         </div>
       </div>
     </div>

@@ -16,9 +16,15 @@ export interface HulaMyHandProps {
   hasDrawn: boolean;
   /** 게임 시작 직후라 딜 연출을 재생할지 여부. */
   dealIn: boolean;
+  /** 아직 쓰지 않은 땡큐 카드 id. 있으면 버리는 대신 취소만 할 수 있다. */
+  thankYouCardId: string | null;
+  /** 스톱을 부를 수 있는지 (손패 합이 상한 이하이고 아직 안 가져왔을 때). */
+  canStop: boolean;
   onToggleCard: (cardId: string) => void;
   onRegister: () => void;
   onDiscard: () => void;
+  onCancelThankYou: () => void;
+  onStop: () => void;
 }
 
 /**
@@ -31,9 +37,13 @@ export interface HulaMyHandProps {
  * @param props.isMyTurn
  * @param props.hasDrawn
  * @param props.dealIn
+ * @param props.thankYouCardId - 아직 못 쓴 땡큐 카드
+ * @param props.canStop - 스톱을 부를 수 있는지
  * @param props.onToggleCard
  * @param props.onRegister
  * @param props.onDiscard
+ * @param props.onCancelThankYou - 땡큐 취소 콜백
+ * @param props.onStop - 스톱 선언 콜백
  * @returns 내 손패 영역 엘리먼트
  */
 export const HulaMyHand = ({
@@ -43,9 +53,13 @@ export const HulaMyHand = ({
   isMyTurn,
   hasDrawn,
   dealIn,
+  thankYouCardId,
+  canStop,
   onToggleCard,
   onRegister,
   onDiscard,
+  onCancelThankYou,
+  onStop,
 }: HulaMyHandProps): JSX.Element => {
   // 드래그로 바꾼 손패 순서. 서버는 정렬해서 보내주지만, 직접 옮긴 배치가
   // 있으면 그쪽을 우선한다. 새로 가져온 카드는 맨 앞에 붙인다.
@@ -89,6 +103,7 @@ export const HulaMyHand = ({
                 key={card.id}
                 card={card}
                 selected={selectedIds.includes(card.id)}
+                highlighted={card.id === thankYouCardId}
                 onClick={canAct ? (): void => onToggleCard(card.id) : undefined}
               />
             ))}
@@ -96,21 +111,46 @@ export const HulaMyHand = ({
         </div>
       </div>
 
-      <div className="flex w-full justify-center gap-2">
+      {thankYouCardId && (
+        <p className="w-full text-center text-sm text-amber-300">
+          땡큐한 카드는 이번 차례에 등록하거나 붙여야 합니다
+        </p>
+      )}
+
+      <div className="flex w-full flex-wrap justify-center gap-2">
         <button
           onClick={onRegister}
           disabled={!canRegister}
-          className="rounded-lg bg-indigo-600 px-6 py-2.5 text-base font-medium transition hover:bg-indigo-500 disabled:opacity-40"
+          className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium sm:px-6 sm:py-2.5 sm:text-base transition hover:bg-indigo-500 disabled:opacity-40"
         >
           등록
         </button>
-        <button
-          onClick={onDiscard}
-          disabled={!canAct || selectedIds.length !== 1}
-          className="rounded-lg border border-slate-700 px-6 py-2.5 text-base font-medium transition hover:bg-slate-800 disabled:opacity-40"
-        >
-          버리기
-        </button>
+        {/* 땡큐한 카드를 아직 못 썼으면 차례를 끝낼 수 없다 — 버리기 자리에
+            취소 버튼을 둬서 물러날 길만 남긴다. */}
+        {thankYouCardId ? (
+          <button
+            onClick={onCancelThankYou}
+            className="rounded-lg border border-amber-500 px-4 py-2 text-sm font-medium text-amber-300 sm:px-6 sm:py-2.5 sm:text-base transition hover:bg-amber-950"
+          >
+            땡큐 취소
+          </button>
+        ) : (
+          <button
+            onClick={onDiscard}
+            disabled={!canAct || selectedIds.length !== 1}
+            className="rounded-lg border border-slate-700 px-4 py-2 text-sm font-medium sm:px-6 sm:py-2.5 sm:text-base transition hover:bg-slate-800 disabled:opacity-40"
+          >
+            버리기
+          </button>
+        )}
+        {canStop && (
+          <button
+            onClick={onStop}
+            className="rounded-lg bg-amber-500 px-4 py-2 text-sm font-bold text-amber-950 sm:px-6 sm:py-2.5 sm:text-base transition hover:bg-amber-400"
+          >
+            스톱!
+          </button>
+        )}
       </div>
     </div>
   );

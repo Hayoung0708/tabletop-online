@@ -56,6 +56,8 @@ import {
 } from "@/server/onecard/gameLogic";
 import {
   appendToHulaMeld,
+  callHulaStop,
+  cancelHulaThankYou,
   discardHulaCard,
   drawHulaCard,
   finalizeHulaGameOver,
@@ -64,6 +66,7 @@ import {
   type HulaDrawSource,
 } from "@/server/hula/gameLogic";
 import { ONE_CARD_CALL_GRACE_MS } from "@/constants/onecard";
+import { HULA_REVEAL_HOLD_MS } from "@/constants/hula";
 import type { Suit } from "@/server/shithead/deck";
 import {
   BURN_HOLD_MS,
@@ -80,7 +83,6 @@ import { cardsFlightMs } from "@/utils/shithead";
 interface SocketData {
   userId: string;
   nickname: string;
-  wins: number;
 }
 
 // 새로고침되면 소켓이 잠깐 끊겼다가 다시 붙는다. 재접속 유예 시간을 두어
@@ -122,14 +124,18 @@ app.prepare().then(() => {
   };
 
   /**
-   * 1등한 플레이어의 누적 승수를 올린다. 게스트 id에 붙는 값이라 게임 종류를
-   * 바꾸거나 다른 방으로 옮겨도 그대로 유지된다.
+   * 1등한 플레이어의 승수를 올린다. 이 방에서 쌓은 기록이라 게임 종류를 바꿔도
+   * 이어지지만, 방을 옮기면 0부터 다시 센다.
    * @param room - 대상 방
    * @param winnerUserId - 1등한 게스트 id
    */
   const awardWin = async (room: RoomState, winnerUserId: string): Promise<void> => {
-    const updated = await prisma.player.update({
-      where: { id: winnerUserId },
+    // 결과 저장이 두 번 돌아도(연출 타이머 중복 등) 승수는 판당 한 번만 오른다.
+    if (room.winAwarded) return;
+    room.winAwarded = true;
+
+    const updated = await prisma.roomPlayer.update({
+      where: { roomId_playerId: { roomId: room.dbId, playerId: winnerUserId } },
       data: { wins: { increment: 1 } },
     });
     // 결과 화면에서 바로 반영되도록 인메모리 값도 맞추고 다시 알린다 —
@@ -158,11 +164,13 @@ app.prepare().then(() => {
       data: { status: "FINISHED", finishedAt: new Date() },
     });
 
-    // 야찌는 총점이 가장 높은 사람이 1등이다.
+    // 야찌는 총점이 가장 높은 사람이 1등이다. 다만 아무도 점수를 못 낸 판은
+    // 실제로 진행된 게임이 아니므로 승수를 주지 않는다 — 안 그러면 좌석
+    // 순서상 맨 앞(대개 방장)이 공짜로 1승을 가져간다.
     const [best] = [...room.players].sort(
       (a, b) => (totals[b.userId] ?? 0) - (totals[a.userId] ?? 0),
     );
-    if (best) await awardWin(room, best.userId);
+    if (best && (totals[best.userId] ?? 0) > 0) await awardWin(room, best.userId);
   };
 
   /**
@@ -264,6 +272,21 @@ app.prepare().then(() => {
         await persistHulaResults(room);
       })();
     }, delay);
+  };
+
+  /**
+   * 손패를 다 턴 사람이 나와 훌라 판이 끝났을 때의 뒷일. 등록 없이 한 번에
+   * 털었으면(훌라) 축하 연출을 알리고, 모두의 손패가 뒤집히는 연출을 다
+   * 보여준 뒤 결과 화면으로 넘어간다.
+   * @param room - 대상 방
+   * @param code - 방 코드
+   * @param extraDelay - 마지막 카드 비행처럼 먼저 끝나야 할 연출 시간(ms)
+   */
+  const finishHulaRound = (room: RoomState, code: string, extraDelay = 0): void => {
+    if (room.game.type === "HULA" && room.game.hulaUserId) {
+      io.to(code).emit("hula_hula", { playerId: room.game.hulaUserId });
+    }
+    scheduleHulaGameOver(room, extraDelay + HULA_REVEAL_HOLD_MS + GAME_OVER_HOLD_MS);
   };
 
   /**
@@ -409,6 +432,11 @@ app.prepare().then(() => {
     const room = getRoom(code);
     if (!room) return;
 
+    // 새로고침하면 새 소켓이 먼저 붙고 옛 소켓의 끊김이 뒤늦게 도착할 수 있다.
+    // 그때 그대로 처리하면 이미 돌아온 사람을 남들 화면에서 내보내게 된다.
+    const live = await io.in(code).fetchSockets();
+    if (live.some((s) => s.data.userId === userId)) return;
+
     setConnected(room, userId, false);
     const newHostId = reassignHostIfNeeded(room);
 
@@ -456,7 +484,6 @@ app.prepare().then(() => {
 
       socket.data.userId = guestId;
       socket.data.nickname = player.nickname;
-      socket.data.wins = player.wins;
       nextFn();
     } catch {
       nextFn(new Error("AUTH_FAILED"));
@@ -478,10 +505,24 @@ app.prepare().then(() => {
           return;
         }
 
-        const isMember = dbRoom.players.some((p) => p.playerId === socket.data.userId);
-        if (!isMember) {
-          socket.emit("error_message", "참가하지 않은 방입니다.");
-          return;
+        // 새로고침으로 소켓이 끊긴 사이 정리 타이머가 참가 기록을 지워버릴 수
+        // 있다. 대기 중이고 자리가 있으면 조용히 다시 앉혀 준다 — 안 그러면
+        // 돌아온 사람이 "참가하지 않은 방"으로 막혀 영영 못 들어온다.
+        let member = dbRoom.players.find((p) => p.playerId === socket.data.userId);
+        if (!member) {
+          const canRejoin =
+            dbRoom.status === "WAITING" && dbRoom.players.length < dbRoom.maxPlayers;
+          if (!canRejoin) {
+            socket.emit("error_message", "참가하지 않은 방입니다.");
+            return;
+          }
+          const nextSeat =
+            dbRoom.players.reduce((max, p) => Math.max(max, p.seat), -1) + 1;
+          member = await prisma.roomPlayer.create({
+            data: { roomId: dbRoom.id, playerId: socket.data.userId, seat: nextSeat },
+            include: { player: true },
+          });
+          dbRoom.players.push(member);
         }
 
         roomCode = code;
@@ -499,10 +540,15 @@ app.prepare().then(() => {
 
         if (room.players.length === 0) {
           for (const p of [...dbRoom.players].sort((a, b) => a.seat - b.seat)) {
-            addPlayer(room, p.playerId, p.player.nickname ?? "플레이어", p.player.wins);
+            addPlayer(room, p.playerId, p.player.nickname ?? "플레이어", p.wins);
           }
         } else {
-          addPlayer(room, socket.data.userId, socket.data.nickname, socket.data.wins);
+          // 닉네임은 소켓 핸드셰이크 때 박제된 값이 아니라 DB에서 다시 읽는다 —
+          // 나갔다가 닉네임을 바꿔 들어와도 소켓이 재사용되면 옛 이름이 남는다.
+          // 승수도 이 방에서 쌓은 것만 센다 (다른 방 기록은 따라오지 않는다).
+          const nickname = member.player.nickname ?? socket.data.nickname;
+          socket.data.nickname = nickname;
+          addPlayer(room, socket.data.userId, nickname, member.wins);
         }
 
         clearLastPlayerTimer(code);
@@ -796,7 +842,43 @@ app.prepare().then(() => {
           playerId: socket.data.userId,
           source: result.source,
         });
+        // 더미를 가져가는 건 언제나 땡큐다 — 모두에게 알려 토스트를 띄운다.
+        if (result.thankYou) {
+          io.to(roomCode).emit("hula_thankyou", { playerId: socket.data.userId });
+        }
         await broadcastRoomState(room);
+      } catch (err) {
+        socket.emit("error_message", (err as Error).message);
+      }
+    });
+
+    socket.on("hula_cancel_thankyou", async () => {
+      if (!roomCode) return;
+      const room = getRoom(roomCode);
+      if (!room) return;
+
+      try {
+        cancelHulaThankYou(room, socket.data.userId);
+        await broadcastRoomState(room);
+      } catch (err) {
+        socket.emit("error_message", (err as Error).message);
+      }
+    });
+
+    socket.on("hula_stop", async () => {
+      if (!roomCode) return;
+      const room = getRoom(roomCode);
+      if (!room) return;
+
+      try {
+        const result = callHulaStop(room, socket.data.userId);
+        io.to(roomCode).emit("hula_stop", {
+          playerId: socket.data.userId,
+          points: result.points,
+        });
+        await broadcastRoomState(room);
+        // 모두의 손패가 뒤집히는 연출을 다 보여준 뒤 결과 화면으로 넘어간다.
+        scheduleHulaGameOver(room, HULA_REVEAL_HOLD_MS + GAME_OVER_HOLD_MS);
       } catch (err) {
         socket.emit("error_message", (err as Error).message);
       }
@@ -809,8 +891,10 @@ app.prepare().then(() => {
 
       try {
         const result = registerHulaMeld(room, socket.data.userId, cardIds);
+        // 조합을 바닥에 내려놓는 소리를 클라이언트가 낼 수 있게 알린다.
+        io.to(roomCode).emit("hula_meld", { playerId: socket.data.userId });
         await broadcastRoomState(room);
-        if (result.gameOver) scheduleHulaGameOver(room, GAME_OVER_HOLD_MS);
+        if (result.gameOver) finishHulaRound(room, roomCode);
       } catch (err) {
         socket.emit("error_message", (err as Error).message);
       }
@@ -825,8 +909,9 @@ app.prepare().then(() => {
 
         try {
           const result = appendToHulaMeld(room, socket.data.userId, meldId, cardId);
+          io.to(roomCode).emit("hula_append", { playerId: socket.data.userId });
           await broadcastRoomState(room);
-          if (result.gameOver) scheduleHulaGameOver(room, GAME_OVER_HOLD_MS);
+          if (result.gameOver) finishHulaRound(room, roomCode);
         } catch (err) {
           socket.emit("error_message", (err as Error).message);
         }
@@ -847,9 +932,7 @@ app.prepare().then(() => {
           cards: [result.discarded],
         });
         await broadcastRoomState(room);
-        if (result.gameOver) {
-          scheduleHulaGameOver(room, cardsFlightMs(1) + GAME_OVER_HOLD_MS);
-        }
+        if (result.gameOver) finishHulaRound(room, code, cardsFlightMs(1));
       } catch (err) {
         socket.emit("error_message", (err as Error).message);
       }

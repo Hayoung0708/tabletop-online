@@ -45,7 +45,8 @@ export const Die = ({
       onClick={onClick}
       disabled={disabled}
       aria-pressed={held}
-      className={`die grid h-14 w-14 shrink-0 grid-cols-3 grid-rows-3 gap-1 rounded-lg border-2 p-2 shadow transition-all duration-150 sm:h-16 sm:w-16 sm:p-2.5 ${
+      // 폭이 좁으면 주사위도 같이 작아진다 — 5개가 트레이 안에 항상 들어가야 한다.
+      className={`die grid aspect-square w-[clamp(2.25rem,11vw,4rem)] shrink-0 grid-cols-3 grid-rows-3 gap-[3%] rounded-lg border-2 p-[7%] shadow transition-all duration-150 ${
         held
           ? "-translate-y-1 border-indigo-400 bg-indigo-50 shadow-indigo-500/50"
           : "border-slate-300 bg-white"
@@ -57,7 +58,7 @@ export const Die = ({
         <span key={i} className="flex items-center justify-center">
           {pips.includes(i) && (
             <span
-              className={`h-2.5 w-2.5 rounded-full sm:h-3 sm:w-3 ${
+              className={`h-[70%] w-[70%] rounded-full ${
                 held ? "bg-indigo-600" : "bg-slate-800"
               }`}
             />

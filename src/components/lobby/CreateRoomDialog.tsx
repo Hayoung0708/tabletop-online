@@ -50,7 +50,7 @@ export const CreateRoomDialog = ({
       ref={dialogRef}
       onClose={form.clearError}
       onClick={handleBackdropClick}
-      className="m-auto w-[min(28rem,calc(100vw-2rem))] rounded-2xl border border-slate-700 bg-slate-900 p-6 text-slate-100 backdrop:bg-black/60"
+      className="m-auto max-h-[85dvh] w-[min(28rem,calc(100vw-2rem))] overflow-y-auto rounded-2xl border border-slate-700 bg-slate-900 p-5 text-slate-100 backdrop:bg-black/60 sm:p-6"
     >
       <form method="dialog" onSubmit={handleSubmit} className="flex flex-col gap-5">
         <h2 className="text-2xl font-bold">새 방 만들기</h2>
@@ -80,7 +80,6 @@ export const CreateRoomDialog = ({
                   className={`h-24 w-24 ${g.disabled ? "opacity-40" : ""}`}
                 />
                 <span className="-mt-3 text-lg font-semibold">{g.label}</span>
-                <span className="text-center text-sm text-slate-400">{g.desc}</span>
               </button>
             ))}
           </div>

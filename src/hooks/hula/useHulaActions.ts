@@ -8,6 +8,8 @@ export interface UseHulaActionsResult {
   registerMeld: (cardIds: string[]) => void;
   appendCard: (meldId: string, cardId: string) => void;
   discardCard: (cardId: string) => void;
+  cancelThankYou: () => void;
+  callStop: () => void;
 }
 
 /**
@@ -48,5 +50,15 @@ export const useHulaActions = (): UseHulaActionsResult => {
     getSocket().emit("hula_discard", { cardId });
   };
 
-  return { drawCard, registerMeld, appendCard, discardCard };
+  /** 땡큐를 취소하고 차례를 원래 사람에게 돌려준다. */
+  const cancelThankYou = (): void => {
+    getSocket().emit("hula_cancel_thankyou");
+  };
+
+  /** 스톱을 선언한다. */
+  const callStop = (): void => {
+    getSocket().emit("hula_stop");
+  };
+
+  return { drawCard, registerMeld, appendCard, discardCard, cancelThankYou, callStop };
 };

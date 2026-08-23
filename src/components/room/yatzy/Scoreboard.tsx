@@ -57,8 +57,8 @@ export const Scoreboard = ({
   onScore,
 }: ScoreboardProps): JSX.Element => {
   return (
-    <div className="rounded-xl border border-slate-800 bg-slate-900/40">
-      <table className="w-full border-collapse text-base">
+    <div className="overflow-x-auto rounded-xl border border-slate-800 bg-slate-900/40">
+      <table className="w-full min-w-[22rem] border-collapse text-sm sm:text-base">
         <thead>
           <tr className="bg-slate-900">
             <th className="rounded-tl-xl py-1.5 pr-2 pl-4 text-left text-base font-bold text-slate-200">
