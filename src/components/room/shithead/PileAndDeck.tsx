@@ -9,12 +9,19 @@ import {
   CARD_FLIGHT_STAGGER_MS,
   SHITHEAD_ANCHOR,
 } from "@/constants/shithead";
-import type { Card } from "@/server/shithead/deck";
+import { effectiveRank, getEffectiveTopCard, type Card } from "@/server/shithead/deck";
 
 export interface PileAndDeckProps {
   pile: Card[];
   deckCount: number;
+  /** 가장 최근 한 번에 낸 장수 — hover했을 때 이만큼 옆으로 펼친다. */
+  lastPlayedCount: number;
 }
+
+/** hover했을 때 카드 한 장씩 옆으로 밀리는 간격(px). */
+const SPREAD_STEP_PX = 22;
+/** 7 아래 카드를 드러내기 위해 7 묶음을 통째로 오른쪽으로 미는 거리(px). */
+const SEVEN_REVEAL_PX = 30;
 
 // 카드와 같은 치수 — 덱/더미도 손패와 똑같은 크기로 그린다.
 const EMPTY_SLOT_CLASS =
@@ -29,9 +36,15 @@ const EMPTY_SLOT_CLASS =
  * @param props - 더미/덱 상태
  * @param props.pile
  * @param props.deckCount
+ * @param props.lastPlayedCount
  * @returns 덱+더미 엘리먼트
  */
-export const PileAndDeck = ({ pile, deckCount }: PileAndDeckProps): JSX.Element => {
+export const PileAndDeck = ({
+  pile,
+  deckCount,
+  lastPlayedCount,
+}: PileAndDeckProps): JSX.Element => {
+  const [hovered, setHovered] = useState(false);
   // 렌더 단계에서 pile 증가를 즉시 감지해 새 top을 감춘다 — 이펙트(페인트 후)로
   // 걸면 새 카드가 한두 프레임 먼저 비쳐 깜빡인다.
   const [lastLen, setLastLen] = useState(pile.length);
@@ -60,6 +73,18 @@ export const PileAndDeck = ({ pile, deckCount }: PileAndDeckProps): JSX.Element 
 
   const visibleLen = pile.length - heldCount;
   const topCard = pile[visibleLen - 1];
+
+  // 맨 위에 놓인 "이번에 낸 묶음". hover하면 이 카드들만 옆으로 펼쳐 몇 장을
+  // 냈는지 보여준다. 7 묶음은 투명 카드라 그 아래 유효 카드까지 드러낸다.
+  const groupSize = Math.min(Math.max(lastPlayedCount, 1), Math.max(visibleLen, 0));
+  const topGroup = pile.slice(visibleLen - groupSize, visibleLen);
+  const isSevenGroup = topGroup.length > 0 && effectiveRank(topGroup[0]) === "7";
+  const underCard = isSevenGroup
+    ? getEffectiveTopCard(pile.slice(0, visibleLen - groupSize))
+    : null;
+  // 한 장짜리 일반 카드는 펼칠 게 없으니 hover 연출을 하지 않는다.
+  const spread = hovered && (groupSize > 1 || (isSevenGroup && underCard !== null));
+  const groupBaseX = spread && underCard ? SEVEN_REVEAL_PX : 0;
 
   // 더미가 타서 사라질 때: 서버가 실제로 비우기 직전에 지금 보이는 맨 위
   // 카드를 붙잡아 두고, 사라지는 연출이 끝나야 놓아준다 — 그래야 쌓인
@@ -100,6 +125,8 @@ export const PileAndDeck = ({ pile, deckCount }: PileAndDeckProps): JSX.Element 
         <div
           data-anchor={SHITHEAD_ANCHOR.pile}
           className="relative h-20 w-14 sm:h-24 sm:w-16"
+          onMouseEnter={(): void => setHovered(true)}
+          onMouseLeave={(): void => setHovered(false)}
         >
           {/* 점선 빈 자리는 항상 밑에 깔아 둔다 — 카드가 있으면 완전히
               가려지고, 태워 사라질 때는 카드만 애니메이션되며 자리는
@@ -110,13 +137,30 @@ export const PileAndDeck = ({ pile, deckCount }: PileAndDeckProps): JSX.Element 
               <BurningPileCard card={burningCard} />
             </div>
           )}
-          {!burningCard && topCard && (
+          {/* 7 아래에 깔린 유효 카드 — 7 묶음에 hover했을 때만 드러난다. */}
+          {!burningCard && underCard && (
             <div className="absolute inset-0">
-              {/* key로 카드가 바뀔 때 엘리먼트를 새로 만든다 — 같은 노드를
-                  재사용하면 남아 있던 스타일이 전이되며 색이 한 번 반짝일 수 있다. */}
-              <PlayingCard key={topCard.id} card={topCard} />
+              <PlayingCard key={underCard.id} card={underCard} />
             </div>
           )}
+          {!burningCard &&
+            topCard &&
+            topGroup.map((card, index) => (
+              // key로 카드가 바뀔 때 엘리먼트를 새로 만든다 — 같은 노드를
+              // 재사용하면 남아 있던 스타일이 전이되며 색이 한 번 반짝일 수 있다.
+              <div
+                key={card.id}
+                className="absolute inset-0 transition-transform duration-200"
+                style={{
+                  transform: spread
+                    ? `translateX(${groupBaseX + index * SPREAD_STEP_PX}px)`
+                    : "none",
+                  zIndex: index + 1,
+                }}
+              >
+                <PlayingCard card={card} />
+              </div>
+            ))}
         </div>
         <span className="text-sm text-slate-400">더미 {visibleLen}장</span>
       </div>

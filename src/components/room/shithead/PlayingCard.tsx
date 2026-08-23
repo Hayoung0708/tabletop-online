@@ -2,16 +2,16 @@
 
 import type { JSX } from "react";
 import { Club, Diamond, Heart, Spade } from "lucide-react";
-import type { Card } from "@/server/shithead/deck";
+import type { Suit } from "@/server/shithead/deck";
 
-const SUIT_ICON: Record<Card["suit"], typeof Club> = {
+const SUIT_ICON: Record<Suit, typeof Club> = {
   clubs: Club,
   diamonds: Diamond,
   hearts: Heart,
   spades: Spade,
 };
 
-const RED_SUITS: readonly Card["suit"][] = ["diamonds", "hearts"];
+const RED_SUITS: readonly Suit[] = ["diamonds", "hearts"];
 
 /**
  * 화면에 그릴 수 있는 카드 모양 — 싯헤드 카드는 그대로 맞고, 원카드의
@@ -20,7 +20,7 @@ const RED_SUITS: readonly Card["suit"][] = ["diamonds", "hearts"];
 export interface DisplayCard {
   id: string;
   rank: string;
-  suit: Card["suit"] | null;
+  suit: Suit | null;
 }
 
 export interface PlayingCardProps {
@@ -72,9 +72,13 @@ export const PlayingCard = ({
       <button
         type="button"
         onClick={onClick}
-        disabled={disabled || !onClick}
+        // onClick이 없다고 HTML disabled로 두면 포인터 이벤트가 아예 안 와서
+        // 내 차례가 아닐 때 카드를 끌 수 없다. 진짜 못 내는 카드만 막는다.
+        disabled={disabled}
         className={`${CARD_BASE_CLASS} ${sizeClass} ${disabled ? FACE_DOWN_DISABLED_CLASS : FACE_DOWN_ACTIVE_CLASS} ${
-          onClick && !disabled ? "cursor-pointer hover:-translate-y-1" : "cursor-default"
+          onClick && !disabled
+            ? "cursor-pointer hover:-translate-y-1"
+            : "cursor-[inherit]"
         }`}
       />
     );
@@ -101,9 +105,9 @@ export const PlayingCard = ({
       type="button"
       data-card-id={card.id}
       onClick={onClick}
-      disabled={disabled || !onClick}
+      disabled={disabled}
       className={`${CARD_BASE_CLASS} ${sizeClass} ${colorClass} ${
-        onClick && !disabled ? "cursor-pointer hover:-translate-y-1" : "cursor-default"
+        onClick && !disabled ? "cursor-pointer hover:-translate-y-1" : "cursor-[inherit]"
       }`}
     >
       {isJoker ? <span className="text-3xl">🃏</span> : <span>{card.rank}</span>}

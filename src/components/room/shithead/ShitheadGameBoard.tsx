@@ -6,9 +6,10 @@ import { PileAndDeck } from "@/components/room/shithead/PileAndDeck";
 import { MyZones } from "@/components/room/shithead/MyZones";
 import { FaceUpSelection } from "@/components/room/shithead/FaceUpSelection";
 import { ShitheadFinishedPanel } from "@/components/room/shithead/ShitheadFinishedPanel";
-import { StarterAnnounceToast } from "@/components/room/shithead/StarterAnnounceToast";
+import { CenterAnnounceToast } from "@/components/room/CenterAnnounceToast";
 import { useShitheadActions } from "@/hooks/shithead/useShitheadActions";
 import { useStarterAnnounce } from "@/hooks/shithead/useStarterAnnounce";
+import { useCenterAnnounce } from "@/hooks/useCenterAnnounce";
 import type { PublicRoomState } from "@/server/roomManager";
 
 export interface ShitheadGameBoardProps {
@@ -18,7 +19,7 @@ export interface ShitheadGameBoardProps {
 
 /**
  * 싯헤드 게임판: 상대방 카드 상태, 가운데 더미/덱, 내 카드 영역을 조립한다.
- * 딜 직후에는 전원이 바닥패 3장을 고를 때까지 선택 화면을 먼저 보여준다.
+ * 딜 직후에는 전원이 얼굴패 3장을 고를 때까지 선택 화면을 먼저 보여준다.
  * 게임이 끝나면(FINISHED) 등수표만 보여준다 — 재시작은 room 페이지의
  * 대기 카드(설정/시작)가 맡는다.
  * @param props - 방 상태, 내 게스트 id
@@ -41,10 +42,8 @@ export const ShitheadGameBoard = ({
    */
   const nicknameOf = (id: string): string =>
     state.players.find((p) => p.userId === id)?.nickname ?? "-";
-  const starterAnnounce = useStarterAnnounce(
-    allSelected,
-    nicknameOf(game?.currentPlayerId ?? ""),
-  );
+  const { announce, showAnnounce } = useCenterAnnounce();
+  useStarterAnnounce(allSelected, nicknameOf(game?.currentPlayerId ?? ""), showAnnounce);
 
   if (!game) return null;
   const me = game.players.find((p) => p.userId === userId);
@@ -69,7 +68,7 @@ export const ShitheadGameBoard = ({
 
   return (
     <>
-      <StarterAnnounceToast announce={starterAnnounce} />
+      <CenterAnnounceToast announce={announce} />
 
       {state.status === "PLAYING" && (
         <>
@@ -90,7 +89,11 @@ export const ShitheadGameBoard = ({
             ))}
           </div>
 
-          <PileAndDeck pile={game.pile} deckCount={game.deckCount} />
+          <PileAndDeck
+            pile={game.pile}
+            deckCount={game.deckCount}
+            lastPlayedCount={game.lastPlayedCount}
+          />
 
           {!me.selectionDone ? (
             <FaceUpSelection

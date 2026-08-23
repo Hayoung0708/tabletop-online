@@ -22,7 +22,7 @@ export interface OpponentRowProps {
 /**
  * 다른 플레이어 한 명의 카드 상태. 바닥패는 왼쪽에 겹치지 않게, 손패는
  * 그 오른쪽 위쪽에 뒷면으로 겹쳐서 보여준다 (얼굴카드/손패 실제 개수만
- * 공개됨). 바닥패 선택 단계에는 닉네임 옆에 완료/진행중 아이콘을 보여준다.
+ * 공개됨). 얼굴패 선택 단계에는 닉네임 옆에 완료/진행중 아이콘을 보여준다.
  * @param props - 닉네임과 공개된 카드 상태
  * @param props.nickname
  * @param props.player
@@ -132,12 +132,12 @@ export const OpponentRow = ({
             <Check
               className="h-5 w-5 text-emerald-400"
               strokeWidth={3}
-              aria-label="바닥패 선택 완료"
+              aria-label="얼굴패 선택 완료"
             />
           ) : (
             <Loader2
               className="h-4 w-4 animate-spin text-slate-500"
-              aria-label="바닥패 선택중"
+              aria-label="얼굴패 선택중"
             />
           ))}
       </div>
