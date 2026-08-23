@@ -109,8 +109,8 @@ export const useRoomSocket = (
         ...prev.filter((e) => e.userId !== fromUserId),
         { id: emoteIdSeq, userId: fromUserId, emoteId },
       ]);
-      const audio = EMOTES.find((e) => e.id === emoteId)?.audio;
-      if (audio) playRandomSound(audio);
+      const emote = EMOTES.find((e) => e.id === emoteId);
+      if (emote?.audio) playRandomSound(emote.audio, emote.audioVolume);
     };
 
     socket.on("connect", join);

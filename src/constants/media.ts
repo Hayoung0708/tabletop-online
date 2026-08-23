@@ -29,6 +29,8 @@ export interface EmoteDef {
   media: string;
   /** 같이 재생할 효과음. 여러 개면 매번 무작위로 하나 고른다. 없으면 무음. */
   audio?: string | readonly string[];
+  /** 효과음 음량(0~1). 없으면 원본 그대로. */
+  audioVolume?: number;
   /** 연속 전송 최소 간격(ms). 그동안 버튼이 비활성화된다. 없으면 제한 없음. */
   cooldownMs?: number;
   /** 슬롯 대비 재생 크기 배율. 카드 레이아웃(슬롯 크기)에는 영향 없이 시각적으로만 커진다. 기본 1배(슬롯에 꽉 참). */
@@ -59,6 +61,7 @@ export const EMOTES: readonly EmoteDef[] = [
       "/emotes/happy-sound-2.wav",
       "/emotes/happy-sound-3.wav",
     ],
+    audioVolume: 0.5,
     cooldownMs: 2000,
   },
   {
@@ -67,6 +70,7 @@ export const EMOTES: readonly EmoteDef[] = [
     icon: "/emotes/emote-03-sad.png",
     media: "/emotes/emote-03-sad.gif",
     audio: ["/emotes/sad-sound-1.wav", "/emotes/sad-sound-2.wav"],
+    audioVolume: 0.5,
     cooldownMs: 2000,
   },
 ];
