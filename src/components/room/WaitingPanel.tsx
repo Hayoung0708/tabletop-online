@@ -20,7 +20,11 @@ export interface WaitingPanelProps {
   gameType: string;
   /** 싯헤드 조커(54장) 모드가 켜져 있는지. */
   useJokers: boolean;
-  winnerUserId: string | null;
+  /**
+   * 다른 사람들이 다 나가서 혼자 남아 이긴 사람. 정상적으로 끝난 판에서는
+   * null이라 "나가서 종료" 안내가 뜨지 않는다.
+   */
+  abandonedWinnerUserId: string | null;
   onStartGame: () => void;
   onUpdateRoom: (name: string, gameType: string, useJokers: boolean) => void;
 }
@@ -36,7 +40,7 @@ export interface WaitingPanelProps {
  * @param props.roomName
  * @param props.gameType
  * @param props.useJokers
- * @param props.winnerUserId
+ * @param props.abandonedWinnerUserId
  * @param props.onStartGame
  * @param props.onUpdateRoom
  * @returns 대기 패널 엘리먼트
@@ -49,11 +53,12 @@ export const WaitingPanel = ({
   roomName,
   gameType,
   useJokers,
-  winnerUserId,
+  abandonedWinnerUserId,
   onStartGame,
   onUpdateRoom,
 }: WaitingPanelProps): JSX.Element => {
-  const winnerNickname = players.find((p) => p.userId === winnerUserId)?.nickname ?? "-";
+  const winnerNickname =
+    players.find((p) => p.userId === abandonedWinnerUserId)?.nickname ?? "-";
   // 싯헤드는 덱 한계로 인원이 막힌다 — 52장이면 5명, 조커를 넣은 54장이면 6명.
   const shitheadLimit = useJokers
     ? SHITHEAD_MAX_PLAYERS_WITH_JOKERS
@@ -82,7 +87,7 @@ export const WaitingPanel = ({
 
   return (
     <div className="rounded-xl border border-slate-800 p-6 text-center">
-      {winnerUserId && (
+      {abandonedWinnerUserId && (
         <p className="mb-4 rounded-lg bg-indigo-950 px-4 py-2.5 text-sm text-indigo-200">
           🏆 {winnerNickname}님 승리! 상대방이 나가서 게임이 종료되었습니다.
         </p>

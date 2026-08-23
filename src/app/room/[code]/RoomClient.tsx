@@ -181,7 +181,11 @@ export const RoomClient = ({ code, roomName, userId }: RoomClientProps): JSX.Ele
                     roomName={state.name}
                     gameType={state.game.type}
                     useJokers={state.useJokers}
-                    winnerUserId={state.game.winnerUserId}
+                    // 혼자 남아 이긴 경우에만 방이 WAITING으로 되돌아온다 —
+                    // 정상 종료(FINISHED)에는 안내를 띄우지 않는다.
+                    abandonedWinnerUserId={
+                      state.status === "WAITING" ? state.game.winnerUserId : null
+                    }
                     onStartGame={startGame}
                     onUpdateRoom={updateRoom}
                   />
