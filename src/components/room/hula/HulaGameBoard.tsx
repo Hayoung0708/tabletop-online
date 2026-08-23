@@ -13,9 +13,11 @@ import { useStarterAnnounce } from "@/hooks/shithead/useStarterAnnounce";
 import { useCenterAnnounce } from "@/hooks/useCenterAnnounce";
 import { setHandGrowSource } from "@/hooks/shithead/handGrowSource";
 import {
+  CARD_PLACE_SOUND_SRC,
   CARD_TAKE_FROM_DECK_SOUND_SRC,
   CARD_TAKE_FROM_PILE_SOUND_SRC,
 } from "@/constants/media";
+import { playSoundOnce } from "@/utils/sound";
 import { SHITHEAD_ANCHOR } from "@/constants/shithead";
 import { canSelectTogether } from "@/server/hula/meld";
 import type { HulaDrawSource } from "@/server/hula/gameLogic";
@@ -82,6 +84,22 @@ export const HulaGameBoard = ({
     socket.on("hula_draw", onDraw);
     return (): void => {
       socket.off("hula_draw", onDraw);
+    };
+  }, []);
+
+  // 조합을 내려놓을 때(등록)와 남의 조합에 한 장 붙일 때의 소리.
+  useEffect(() => {
+    const socket = getSocket();
+    /** 조합 등록 — 여러 장을 한꺼번에 내려놓으니 더미 쓸어오는 소리를 쓴다. */
+    const onMeld = (): void => playSoundOnce(CARD_TAKE_FROM_PILE_SOUND_SRC);
+    /** 붙이기 — 카드 한 장이 바닥에 놓이는 소리. */
+    const onAppend = (): void => playSoundOnce(CARD_PLACE_SOUND_SRC);
+
+    socket.on("hula_meld", onMeld);
+    socket.on("hula_append", onAppend);
+    return (): void => {
+      socket.off("hula_meld", onMeld);
+      socket.off("hula_append", onAppend);
     };
   }, []);
 

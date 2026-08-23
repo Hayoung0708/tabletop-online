@@ -832,6 +832,8 @@ app.prepare().then(() => {
 
       try {
         const result = registerHulaMeld(room, socket.data.userId, cardIds);
+        // 조합을 바닥에 내려놓는 소리를 클라이언트가 낼 수 있게 알린다.
+        io.to(roomCode).emit("hula_meld", { playerId: socket.data.userId });
         await broadcastRoomState(room);
         if (result.gameOver) scheduleHulaGameOver(room, GAME_OVER_HOLD_MS);
       } catch (err) {
@@ -848,6 +850,7 @@ app.prepare().then(() => {
 
         try {
           const result = appendToHulaMeld(room, socket.data.userId, meldId, cardId);
+          io.to(roomCode).emit("hula_append", { playerId: socket.data.userId });
           await broadcastRoomState(room);
           if (result.gameOver) scheduleHulaGameOver(room, GAME_OVER_HOLD_MS);
         } catch (err) {
