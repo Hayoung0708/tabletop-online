@@ -35,6 +35,12 @@ export interface RoomState {
   maxPlayers: number;
   /** 싯헤드 전용 — 조커 2장을 넣은 54장 덱으로 할지. 6인은 이 모드여야 한다. */
   useJokers: boolean;
+  /**
+   * 방에 접속한 사람이 아무도 없어진 시각(ms). 잠깐 끊긴 것과 진짜로 버려진
+   * 방을 구분하려고 둔다 — 비자마자 지우면 방장이 잠깐 끊긴 사이에 방이
+   * 사라져서 초대받은 사람들이 "없는 방"을 보게 된다.
+   */
+  emptySince: number | null;
   /** 이번 판의 승수를 이미 올렸는지. 결과 저장이 두 번 돌아도 중복으로 세지 않는다. */
   winAwarded: boolean;
   status: RoomStatus;
@@ -51,6 +57,14 @@ const rooms = new Map<string, RoomState>();
  */
 export const getRoom = (code: string): RoomState | undefined => {
   return rooms.get(code);
+};
+
+/**
+ * 지금 메모리에 살아 있는 방을 모두 돌려준다 (버려진 방 청소용).
+ * @returns 방 상태 목록
+ */
+export const listRooms = (): RoomState[] => {
+  return [...rooms.values()];
 };
 
 /**
@@ -86,6 +100,7 @@ export const createOrGetRoom = (
     maxPlayers,
     useJokers,
     winAwarded: false,
+    emptySince: null,
     status: "WAITING",
     players: [],
     game: idleGame,
@@ -108,6 +123,8 @@ export const addPlayer = (
   nickname: string,
   wins: number,
 ): PlayerState => {
+  room.emptySince = null;
+
   const existing = room.players.find((p) => p.userId === userId);
   if (existing) {
     existing.connected = true;
@@ -138,6 +155,7 @@ export const setConnected = (
 ): void => {
   const player = room.players.find((p) => p.userId === userId);
   if (player) player.connected = connected;
+  if (connected) room.emptySince = null;
 };
 
 /**

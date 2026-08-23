@@ -15,6 +15,7 @@ import {
   deleteRoom,
   getRoom,
   isRoomEmpty,
+  listRooms,
   reassignHostIfNeeded,
   removeDisconnectedPlayers,
   setConnected,
@@ -92,6 +93,9 @@ const RECONNECT_GRACE_MS = 3_000;
 // 등)을 주기적으로 정리하는 간격.
 const STALE_ROOM_SWEEP_INTERVAL_MS = 30_000;
 const STALE_ROOM_AGE_MS = 60_000;
+// 전원이 나간 방을 이만큼 남겨 둔다. 방장이 잠깐 끊겼다 돌아오는 동안 방이
+// 사라지면 코드를 받아 들어오려던 사람들이 "없는 방"을 보게 된다.
+const EMPTY_ROOM_GRACE_MS = 180_000;
 
 const port = parseInt(process.env.PORT || "3000", 10);
 const dev = process.env.NODE_ENV !== "production";
@@ -360,6 +364,30 @@ app.prepare().then(() => {
   };
 
   /**
+   * 대기 중인 방에서 돌아오지 않은 사람을 목록에서 뺀다 — 남겨 두면 인원수와
+   * 시작 가능 여부가 부풀려진다.
+   * @param room - 대상 방
+   */
+  const dropDisconnectedFromWaitingRoom = async (room: RoomState): Promise<void> => {
+    const removed = removeDisconnectedPlayers(room);
+    if (removed.length === 0) return;
+
+    try {
+      await prisma.roomPlayer.deleteMany({
+        where: { roomId: room.dbId, playerId: { in: removed } },
+      });
+      await prisma.room.update({
+        where: { code: room.code },
+        data: { hostId: room.hostId },
+      });
+    } catch (err) {
+      console.error(err);
+    }
+
+    await broadcastRoomState(room);
+  };
+
+  /**
    * 유예 시간이 지난 뒤에도 여전히 나간 상태인지 다시 확인하고 상황에 맞게
    * 정리한다. 타이머 설정 시점의 스냅샷이 아니라 지금 상태를 다시 조회하므로,
    * 그사이 재접속했으면 자연히 아무 일도 하지 않는다.
@@ -369,31 +397,14 @@ app.prepare().then(() => {
     const room = getRoom(code);
     if (!room) return;
 
+    // 전원이 끊겼어도 바로 지우지 않는다 — 유예 시간이 지나면 청소가 지운다.
     if (isRoomEmpty(room)) {
-      deleteRoom(room.code);
-      await prisma.room.delete({ where: { code: room.code } }).catch(() => {});
+      room.emptySince ??= Date.now();
       return;
     }
 
-    // 아직 대기 중이면: 돌아오지 않은 사람은 목록에서 빼서 인원수와 시작
-    // 가능 여부를 부풀리지 않게 한다.
     if (room.status === "WAITING") {
-      const removed = removeDisconnectedPlayers(room);
-      if (removed.length === 0) return;
-
-      try {
-        await prisma.roomPlayer.deleteMany({
-          where: { roomId: room.dbId, playerId: { in: removed } },
-        });
-        await prisma.room.update({
-          where: { code: room.code },
-          data: { hostId: room.hostId },
-        });
-      } catch (err) {
-        console.error(err);
-      }
-
-      await broadcastRoomState(room);
+      await dropDisconnectedFromWaitingRoom(room);
       return;
     }
 
@@ -998,26 +1009,49 @@ app.prepare().then(() => {
     });
   });
 
-  // 만들어졌지만 실제로 아무도 들어오지 않은 방을 주기적으로 정리한다.
+  /**
+   * 이전 실행에서 남은 방 기록을 비운다. 방 상태(손패·차례)는 이 프로세스
+   * 메모리에만 있어서 재시작하면 되살릴 수 없고, 그대로 두면 아무도 못 들어가는
+   * 유령 방이 목록에 남는다.
+   */
+  const clearRoomsFromPreviousRun = async (): Promise<void> => {
+    try {
+      const removed = await prisma.room.deleteMany({});
+      if (removed.count > 0) console.log(`이전 실행에서 남은 방 ${removed.count}개 정리`);
+    } catch (err) {
+      console.error("room boot cleanup failed", err);
+    }
+  };
+
+  // 버려진 방을 주기적으로 정리한다 — 전원이 나간 뒤 유예 시간이 지난 방과,
+  // 만들어졌지만 아무도 들어오지 않은 방.
   setInterval(async () => {
     try {
-      const stale = await prisma.room.findMany({
+      const abandoned = listRooms()
+        .filter((room) => room.emptySince !== null)
+        .filter((room) => Date.now() - (room.emptySince ?? 0) > EMPTY_ROOM_GRACE_MS);
+      for (const room of abandoned) {
+        deleteRoom(room.code);
+        await prisma.room.delete({ where: { code: room.code } }).catch(() => {});
+      }
+
+      const neverJoined = await prisma.room.findMany({
         where: {
-          status: "WAITING",
           players: { none: {} },
           createdAt: { lt: new Date(Date.now() - STALE_ROOM_AGE_MS) },
         },
         select: { code: true },
       });
+      const stale = neverJoined.filter(({ code }) => !getRoom(code)).map((r) => r.code);
       if (stale.length > 0) {
-        await prisma.room.deleteMany({
-          where: { code: { in: stale.map((r) => r.code) } },
-        });
+        await prisma.room.deleteMany({ where: { code: { in: stale } } });
       }
     } catch (err) {
       console.error("room cleanup sweep failed", err);
     }
   }, STALE_ROOM_SWEEP_INTERVAL_MS);
+
+  void clearRoomsFromPreviousRun();
 
   httpServer.listen(port, () => {
     console.log(`> Ready on http://localhost:${port}`);
