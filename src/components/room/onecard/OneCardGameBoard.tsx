@@ -7,11 +7,10 @@ import { OneCardOpponentRow } from "@/components/room/onecard/OneCardOpponentRow
 import { OneCardCenter } from "@/components/room/onecard/OneCardCenter";
 import { OneCardMyHand } from "@/components/room/onecard/OneCardMyHand";
 import { OneCardFinishedPanel } from "@/components/room/onecard/OneCardFinishedPanel";
-import { StarterAnnounceToast } from "@/components/room/shithead/StarterAnnounceToast";
-import { Toast } from "@/components/feedback/Toast";
+import { CenterAnnounceToast } from "@/components/room/CenterAnnounceToast";
 import { useOneCardActions } from "@/hooks/onecard/useOneCardActions";
 import { useStarterAnnounce } from "@/hooks/shithead/useStarterAnnounce";
-import { useToast } from "@/hooks/useToast";
+import { useCenterAnnounce } from "@/hooks/useCenterAnnounce";
 import { setHandGrowSource } from "@/hooks/shithead/handGrowSource";
 import {
   CARD_TAKE_FROM_DECK_SOUND_SRC,
@@ -42,7 +41,7 @@ export const OneCardGameBoard = ({
   userId,
 }: OneCardGameBoardProps): JSX.Element | null => {
   const { playCard, drawCards, callOneCard } = useOneCardActions();
-  const [toast, setToast] = useToast();
+  const { announce, showAnnounce } = useCenterAnnounce();
 
   const game = state.game.type === "ONECARD" ? state.game : null;
 
@@ -80,22 +79,23 @@ export const OneCardGameBoard = ({
     }): void => {
       const name = nicknameOfRef.current(playerId);
       if (success) {
-        setToast({ text: `${name} 원카드!`, tone: "ok" });
+        showAnnounce(`${name} 원카드!`);
         return;
       }
       const caller = nicknameOfRef.current(callerId ?? "");
-      setToast({ text: `${josa(caller, "이/가")} ${name} 원카드 방어!`, tone: "error" });
+      showAnnounce(`${josa(caller, "이/가")} ${name} 원카드 방어!`);
     };
     socket.on("onecard_call_result", onCallResult);
     return (): void => {
       socket.off("onecard_call_result", onCallResult);
     };
-  }, [setToast]);
+  }, [showAnnounce]);
 
   // 게임이 시작된 순간(아직 아무도 수를 두지 않았을 때) 시작 플레이어를 알린다.
-  const starterAnnounce = useStarterAnnounce(
+  useStarterAnnounce(
     state.status === "PLAYING" && game?.movesMade === 0,
     nicknameOf(game?.currentPlayerId ?? ""),
+    showAnnounce,
   );
 
   // 먹기 소리는 손패가 늘어나는 순간 바로 나야 한다. 소리를 지정하지 않으면
@@ -204,8 +204,7 @@ export const OneCardGameBoard = ({
         <OneCardFinishedPanel players={state.players} oneCardPlayers={game.players} />
       )}
 
-      <StarterAnnounceToast announce={starterAnnounce} />
-      <Toast toast={toast} />
+      <CenterAnnounceToast announce={announce} />
     </>
   );
 };
