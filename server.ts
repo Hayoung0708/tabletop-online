@@ -414,6 +414,11 @@ app.prepare().then(() => {
     const room = getRoom(code);
     if (!room) return;
 
+    // 새로고침하면 새 소켓이 먼저 붙고 옛 소켓의 끊김이 뒤늦게 도착할 수 있다.
+    // 그때 그대로 처리하면 이미 돌아온 사람을 남들 화면에서 내보내게 된다.
+    const live = await io.in(code).fetchSockets();
+    if (live.some((s) => s.data.userId === userId)) return;
+
     setConnected(room, userId, false);
     const newHostId = reassignHostIfNeeded(room);
 
@@ -482,10 +487,24 @@ app.prepare().then(() => {
           return;
         }
 
-        const isMember = dbRoom.players.some((p) => p.playerId === socket.data.userId);
-        if (!isMember) {
-          socket.emit("error_message", "참가하지 않은 방입니다.");
-          return;
+        // 새로고침으로 소켓이 끊긴 사이 정리 타이머가 참가 기록을 지워버릴 수
+        // 있다. 대기 중이고 자리가 있으면 조용히 다시 앉혀 준다 — 안 그러면
+        // 돌아온 사람이 "참가하지 않은 방"으로 막혀 영영 못 들어온다.
+        let member = dbRoom.players.find((p) => p.playerId === socket.data.userId);
+        if (!member) {
+          const canRejoin =
+            dbRoom.status === "WAITING" && dbRoom.players.length < dbRoom.maxPlayers;
+          if (!canRejoin) {
+            socket.emit("error_message", "참가하지 않은 방입니다.");
+            return;
+          }
+          const nextSeat =
+            dbRoom.players.reduce((max, p) => Math.max(max, p.seat), -1) + 1;
+          member = await prisma.roomPlayer.create({
+            data: { roomId: dbRoom.id, playerId: socket.data.userId, seat: nextSeat },
+            include: { player: true },
+          });
+          dbRoom.players.push(member);
         }
 
         roomCode = code;

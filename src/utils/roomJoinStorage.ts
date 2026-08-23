@@ -35,6 +35,18 @@ export const markRoomJoined = (code: string, nickname: string): void => {
 };
 
 /**
+ * 지금 화면이 새로고침으로 열린 것인지 확인한다. 새로고침이면 방에 있던
+ * 사람이 잠깐 끊긴 것뿐이라 닉네임 폼 없이 바로 재입장해야 하고, 그 외의
+ * 진입(로비에서 다시 들어오기, 뒤로가기 등)이라면 닉네임을 다시 정할 수
+ * 있어야 한다.
+ * @returns 새로고침으로 들어온 화면이면 true
+ */
+export const isPageReload = (): boolean => {
+  const [entry] = window.performance.getEntriesByType("navigation");
+  return (entry as PerformanceNavigationTiming | undefined)?.type === "reload";
+};
+
+/**
  * "이 방에 참가함" 표시를 지운다 (참가 실패, 의도적 퇴장 시).
  * @param code - 방 코드
  */

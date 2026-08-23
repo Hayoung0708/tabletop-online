@@ -146,7 +146,24 @@ export const RoomClient = ({ code, roomName, userId }: RoomClientProps): JSX.Ele
                 joinError={joinError}
               />
             ) : !state ? (
-              <p className="text-slate-400">방에 연결하는 중...</p>
+              // 연결이 막힌 이유(참가 기록 정리 등)를 여기서도 보여준다 —
+              // 안 그러면 원인 없이 "연결하는 중"만 영영 떠 있는다.
+              <div className="flex flex-col items-start gap-2">
+                <p className="text-slate-400">방에 연결하는 중...</p>
+                {error && (
+                  <>
+                    <p className="rounded-md bg-red-950 px-4 py-2 text-sm text-red-300">
+                      {error}
+                    </p>
+                    <button
+                      onClick={(): void => void joinRoom(nickname)}
+                      className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium transition hover:bg-indigo-500"
+                    >
+                      다시 시도
+                    </button>
+                  </>
+                )}
+              </div>
             ) : (
               <>
                 {error && (

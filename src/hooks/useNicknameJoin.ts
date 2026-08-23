@@ -1,9 +1,10 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   clearRoomJoined,
   hasJoinedRoomBefore,
+  isPageReload,
   markRoomJoined,
   readSavedNickname,
 } from "@/utils/roomJoinStorage";
@@ -18,8 +19,8 @@ export interface UseNicknameJoinResult {
 }
 
 /**
- * 닉네임 입력 폼 상태와 방 참가 API 호출을 관리한다. 새로고침 등으로 이미
- * 참가한 적 있는 방이면 저장된 닉네임으로 자동 재입장을 시도한다.
+ * 닉네임 입력 폼 상태와 방 참가 API 호출을 관리한다. 방에 있던 중 새로고침한
+ * 경우에만 저장된 닉네임으로 자동 재입장하고, 그 외에는 닉네임 폼을 보여준다.
  * @param code - 방 코드
  * @returns 닉네임 폼 상태와 참가 함수
  */
@@ -59,17 +60,19 @@ export const useNicknameJoin = (code: string): UseNicknameJoinResult => {
     }
   };
 
-  // 이 방에 실제로 참가한 적이 있을 때만(새로고침) 자동 재입장한다 — 저장된
-  // 닉네임만으로는 이 브라우저가 예전에 플레이했다는 뜻일 뿐, 방금 만든
-  // 새 방까지 폼을 건너뛰고 들어가야 한다는 뜻은 아니다.
+  // 자동 재입장은 "이 방에 참가한 채로 새로고침한 경우"에만 한다. 로비에서
+  // 다시 들어오거나 뒤로가기로 돌아온 경우에는 닉네임을 다시 정할 수 있어야
+  // 하므로 저장된 닉네임을 폼에 채워만 두고 참가는 하지 않는다.
+  const autoJoinDone = useRef(false);
   useEffect(() => {
     const saved = readSavedNickname();
-    if (!saved) return;
+    if (!saved || autoJoinDone.current) return;
+    autoJoinDone.current = true;
 
-    const alreadyJoined = hasJoinedRoomBefore(code);
+    const rejoin = hasJoinedRoomBefore(code) && isPageReload();
     Promise.resolve().then(() => {
       setNickname(saved);
-      if (alreadyJoined) void joinRoom(saved);
+      if (rejoin) void joinRoom(saved);
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [code]);
