@@ -522,10 +522,15 @@ app.prepare().then(() => {
 
         if (room.players.length === 0) {
           for (const p of [...dbRoom.players].sort((a, b) => a.seat - b.seat)) {
-            addPlayer(room, p.playerId, p.player.nickname ?? "플레이어", p.player.wins);
+            addPlayer(room, p.playerId, p.player.nickname ?? "플레이어", p.wins);
           }
         } else {
-          addPlayer(room, socket.data.userId, socket.data.nickname, socket.data.wins);
+          // 닉네임은 소켓 핸드셰이크 때 박제된 값이 아니라 DB에서 다시 읽는다 —
+          // 나갔다가 닉네임을 바꿔 들어와도 소켓이 재사용되면 옛 이름이 남는다.
+          // 승수도 이 방에서 쌓은 것만 센다 (다른 방 기록은 따라오지 않는다).
+          const nickname = member.player.nickname ?? socket.data.nickname;
+          socket.data.nickname = nickname;
+          addPlayer(room, socket.data.userId, nickname, member.wins);
         }
 
         clearLastPlayerTimer(code);
