@@ -31,8 +31,7 @@ export const GAMES: readonly GameOption[] = [
   {
     id: "HULA",
     label: "훌라",
-    desc: "추후 업데이트 예정",
+    desc: "조합을 만들어 손패를 먼저 다 털면 승리",
     icon: "/icons/hula.svg",
-    disabled: true,
   },
 ];
