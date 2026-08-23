@@ -9,7 +9,7 @@ import { RoomHeader } from "@/components/room/RoomHeader";
 import { NicknameForm } from "@/components/room/NicknameForm";
 import { PlayerSidebar } from "@/components/room/PlayerSidebar";
 import { WaitingPanel } from "@/components/room/WaitingPanel";
-import { Rulebook } from "@/components/room/Rulebook";
+import { Rulebook, RulebookAccordion } from "@/components/room/Rulebook";
 import { LeaveConfirmDialog } from "@/components/room/LeaveConfirmDialog";
 import { YatzyGameBoard } from "@/components/room/yatzy/YatzyGameBoard";
 import { ShitheadGameBoard } from "@/components/room/shithead/ShitheadGameBoard";
@@ -115,7 +115,7 @@ export const RoomClient = ({ code, roomName, userId }: RoomClientProps): JSX.Ele
       <AdRail side="right" />
 
       <DealingProvider>
-        <div className="flex min-h-0 flex-1 justify-center overflow-hidden">
+        <div className="flex min-h-0 flex-1 flex-col overflow-hidden lg:flex-row lg:justify-center">
           {joined && state && (
             <PlayerSidebar
               players={state.players}
@@ -207,6 +207,9 @@ export const RoomClient = ({ code, roomName, userId }: RoomClientProps): JSX.Ele
                     이 방의 참가자가 아닙니다. 로비에서 참가해주세요.
                   </p>
                 )}
+
+                {/* 좁은 화면에는 오른쪽 룰북 자리가 없어 게임판 아래에 접어 둔다. */}
+                <RulebookAccordion gameType={state.game.type} />
               </>
             )}
           </main>

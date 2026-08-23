@@ -50,11 +50,11 @@ export const OneCardOpponentRow = ({
 
   return (
     <div
-      className={`flex flex-col gap-2 rounded-lg border px-3 pt-2 pb-4 ${
+      className={`flex flex-col gap-1.5 rounded-lg border px-2 pt-2 pb-3 sm:gap-2 sm:px-3 sm:pb-4 ${
         isCurrentTurn ? "border-indigo-500 bg-indigo-950/40" : "border-slate-800"
       }`}
     >
-      <div className="flex items-center gap-2 text-lg font-semibold text-slate-200">
+      <div className="flex items-center gap-2 text-base font-semibold text-slate-200 sm:text-lg">
         <span className="truncate">{nickname}</span>
         {player.finishRank && (
           <span className="rounded bg-slate-800 px-1.5 py-0.5 text-xs font-medium text-slate-400">

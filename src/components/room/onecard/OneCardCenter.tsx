@@ -100,7 +100,7 @@ export const OneCardCenter = ({
         </span>
       </div>
 
-      <div className="flex items-start justify-center gap-6">
+      <div className="flex items-start justify-center gap-4 sm:gap-6">
         <div className="flex flex-col items-center gap-1.5">
           <div data-anchor={SHITHEAD_ANCHOR.deck}>
             {deckCount > 0 ? (
