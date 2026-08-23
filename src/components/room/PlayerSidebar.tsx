@@ -213,7 +213,11 @@ export const PlayerSidebar = ({
                   <DisconnectedIcon className="h-4 w-4 shrink-0 text-red-300" />
                 )}
               </div>
-              {extra && <span className="text-slate-200">{extra}</span>}
+              {/* 게임 중에는 손패 장수 같은 진행 정보가, 대기 중에는 승수만 보인다. */}
+              <span className="flex items-center gap-2">
+                {extra && <span className="text-slate-200">{extra}</span>}
+                <span className="text-sm text-slate-400">{p.wins}승</span>
+              </span>
             </div>
 
             <div className="relative shrink-0" style={slotStyle}>
