@@ -172,8 +172,7 @@ export const RoomClient = ({ code, roomName, userId }: RoomClientProps): JSX.Ele
                   </p>
                 )}
 
-                {(state.status === "WAITING" ||
-                  (state.status === "FINISHED" && state.game.type !== "YATZY")) && (
+                {(state.status === "WAITING" || state.status === "FINISHED") && (
                   <WaitingPanel
                     players={state.players}
                     activePlayerCount={activePlayers.length}
@@ -190,11 +189,7 @@ export const RoomClient = ({ code, roomName, userId }: RoomClientProps): JSX.Ele
 
                 {(state.status === "PLAYING" || state.status === "FINISHED") &&
                   (state.game.type === "YATZY" ? (
-                    <YatzyGameBoard
-                      state={state}
-                      userId={userId}
-                      onLeaveRoom={leaveRoom}
-                    />
+                    <YatzyGameBoard state={state} userId={userId} />
                   ) : state.game.type === "ONECARD" ? (
                     <OneCardGameBoard state={state} userId={userId} />
                   ) : state.game.type === "HULA" ? (
