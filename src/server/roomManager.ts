@@ -21,7 +21,7 @@ export interface PlayerState {
   nickname: string;
   seat: number;
   connected: boolean;
-  /** 게임 종류와 무관하게 이 게스트가 지금까지 1등한 횟수. */
+  /** 이 방에서 1등한 횟수. 게임 종류를 바꿔도 이어지고, 방을 옮기면 0부터 센다. */
   wins: number;
 }
 
@@ -35,6 +35,8 @@ export interface RoomState {
   maxPlayers: number;
   /** 싯헤드 전용 — 조커 2장을 넣은 54장 덱으로 할지. 6인은 이 모드여야 한다. */
   useJokers: boolean;
+  /** 이번 판의 승수를 이미 올렸는지. 결과 저장이 두 번 돌아도 중복으로 세지 않는다. */
+  winAwarded: boolean;
   status: RoomStatus;
   players: PlayerState[];
   game: GameData;
@@ -83,6 +85,7 @@ export const createOrGetRoom = (
     hostId,
     maxPlayers,
     useJokers,
+    winAwarded: false,
     status: "WAITING",
     players: [],
     game: idleGame,
@@ -96,7 +99,7 @@ export const createOrGetRoom = (
  * @param room - 대상 방
  * @param userId - 게스트 id
  * @param nickname - 닉네임
- * @param wins - 이 게스트의 누적 승수
+ * @param wins - 이 방에서 쌓은 승수
  * @returns 등록되거나 갱신된 플레이어
  */
 export const addPlayer = (
@@ -219,6 +222,7 @@ export const assertCanStartGame = (
     throw new Error(`이 게임은 최대 ${maxStartPlayers}명까지 시작할 수 있습니다.`);
 
   room.status = "PLAYING";
+  room.winAwarded = false;
 };
 
 /**
@@ -257,7 +261,7 @@ export interface PublicPlayerState {
   nickname: string;
   seat: number;
   connected: boolean;
-  /** 이 게스트의 누적 승수. */
+  /** 이 방에서 쌓은 승수. 방을 옮기면 0부터 다시 센다. */
   wins: number;
 }
 

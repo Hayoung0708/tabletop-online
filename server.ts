@@ -80,7 +80,6 @@ import { cardsFlightMs } from "@/utils/shithead";
 interface SocketData {
   userId: string;
   nickname: string;
-  wins: number;
 }
 
 // 새로고침되면 소켓이 잠깐 끊겼다가 다시 붙는다. 재접속 유예 시간을 두어
@@ -122,14 +121,18 @@ app.prepare().then(() => {
   };
 
   /**
-   * 1등한 플레이어의 누적 승수를 올린다. 게스트 id에 붙는 값이라 게임 종류를
-   * 바꾸거나 다른 방으로 옮겨도 그대로 유지된다.
+   * 1등한 플레이어의 승수를 올린다. 이 방에서 쌓은 기록이라 게임 종류를 바꿔도
+   * 이어지지만, 방을 옮기면 0부터 다시 센다.
    * @param room - 대상 방
    * @param winnerUserId - 1등한 게스트 id
    */
   const awardWin = async (room: RoomState, winnerUserId: string): Promise<void> => {
-    const updated = await prisma.player.update({
-      where: { id: winnerUserId },
+    // 결과 저장이 두 번 돌아도(연출 타이머 중복 등) 승수는 판당 한 번만 오른다.
+    if (room.winAwarded) return;
+    room.winAwarded = true;
+
+    const updated = await prisma.roomPlayer.update({
+      where: { roomId_playerId: { roomId: room.dbId, playerId: winnerUserId } },
       data: { wins: { increment: 1 } },
     });
     // 결과 화면에서 바로 반영되도록 인메모리 값도 맞추고 다시 알린다 —
@@ -456,7 +459,6 @@ app.prepare().then(() => {
 
       socket.data.userId = guestId;
       socket.data.nickname = player.nickname;
-      socket.data.wins = player.wins;
       nextFn();
     } catch {
       nextFn(new Error("AUTH_FAILED"));
