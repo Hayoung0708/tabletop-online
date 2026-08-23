@@ -27,6 +27,8 @@ export interface PlayingCardProps {
   card?: DisplayCard;
   faceDown?: boolean;
   selected?: boolean;
+  /** 꼭 써야 하는 카드처럼 시선을 끌어야 할 때 테두리를 강조한다. */
+  highlighted?: boolean;
   onClick?: () => void;
   disabled?: boolean;
 }
@@ -54,6 +56,7 @@ const FACE_DOWN_DISABLED_CLASS =
  * @param props.card
  * @param props.faceDown
  * @param props.selected
+ * @param props.highlighted - 테두리를 강조할지
  * @param props.onClick
  * @param props.disabled
  * @returns 카드 엘리먼트
@@ -62,10 +65,13 @@ export const PlayingCard = ({
   card,
   faceDown,
   selected,
+  highlighted,
   onClick,
   disabled,
 }: PlayingCardProps): JSX.Element => {
   const sizeClass = SIZE_CLASS;
+  // ring은 border와 겹치지 않아 선택 표시(테두리 색)를 덮어쓰지 않는다.
+  const highlightClass = highlighted ? " ring-2 ring-amber-400" : "";
 
   if (faceDown || !card) {
     return (
@@ -75,7 +81,7 @@ export const PlayingCard = ({
         // onClick이 없다고 HTML disabled로 두면 포인터 이벤트가 아예 안 와서
         // 내 차례가 아닐 때 카드를 끌 수 없다. 진짜 못 내는 카드만 막는다.
         disabled={disabled}
-        className={`${CARD_BASE_CLASS} ${sizeClass} ${disabled ? FACE_DOWN_DISABLED_CLASS : FACE_DOWN_ACTIVE_CLASS} ${
+        className={`${CARD_BASE_CLASS} ${sizeClass}${highlightClass} ${disabled ? FACE_DOWN_DISABLED_CLASS : FACE_DOWN_ACTIVE_CLASS} ${
           onClick && !disabled
             ? "cursor-pointer hover:-translate-y-1"
             : "cursor-[inherit]"
@@ -106,7 +112,7 @@ export const PlayingCard = ({
       data-card-id={card.id}
       onClick={onClick}
       disabled={disabled}
-      className={`${CARD_BASE_CLASS} ${sizeClass} ${colorClass} ${
+      className={`${CARD_BASE_CLASS} ${sizeClass}${highlightClass} ${colorClass} ${
         onClick && !disabled ? "cursor-pointer hover:-translate-y-1" : "cursor-[inherit]"
       }`}
     >

@@ -56,6 +56,8 @@ import {
 } from "@/server/onecard/gameLogic";
 import {
   appendToHulaMeld,
+  callHulaStop,
+  cancelHulaThankYou,
   discardHulaCard,
   drawHulaCard,
   finalizeHulaGameOver,
@@ -64,6 +66,7 @@ import {
   type HulaDrawSource,
 } from "@/server/hula/gameLogic";
 import { ONE_CARD_CALL_GRACE_MS } from "@/constants/onecard";
+import { HULA_REVEAL_HOLD_MS } from "@/constants/hula";
 import type { Suit } from "@/server/shithead/deck";
 import {
   BURN_HOLD_MS,
@@ -269,6 +272,21 @@ app.prepare().then(() => {
         await persistHulaResults(room);
       })();
     }, delay);
+  };
+
+  /**
+   * 손패를 다 턴 사람이 나와 훌라 판이 끝났을 때의 뒷일. 등록 없이 한 번에
+   * 털었으면(훌라) 축하 연출을 알리고, 모두의 손패가 뒤집히는 연출을 다
+   * 보여준 뒤 결과 화면으로 넘어간다.
+   * @param room - 대상 방
+   * @param code - 방 코드
+   * @param extraDelay - 마지막 카드 비행처럼 먼저 끝나야 할 연출 시간(ms)
+   */
+  const finishHulaRound = (room: RoomState, code: string, extraDelay = 0): void => {
+    if (room.game.type === "HULA" && room.game.hulaUserId) {
+      io.to(code).emit("hula_hula", { playerId: room.game.hulaUserId });
+    }
+    scheduleHulaGameOver(room, extraDelay + HULA_REVEAL_HOLD_MS + GAME_OVER_HOLD_MS);
   };
 
   /**
@@ -824,7 +842,43 @@ app.prepare().then(() => {
           playerId: socket.data.userId,
           source: result.source,
         });
+        // 더미를 가져가는 건 언제나 땡큐다 — 모두에게 알려 토스트를 띄운다.
+        if (result.thankYou) {
+          io.to(roomCode).emit("hula_thankyou", { playerId: socket.data.userId });
+        }
         await broadcastRoomState(room);
+      } catch (err) {
+        socket.emit("error_message", (err as Error).message);
+      }
+    });
+
+    socket.on("hula_cancel_thankyou", async () => {
+      if (!roomCode) return;
+      const room = getRoom(roomCode);
+      if (!room) return;
+
+      try {
+        cancelHulaThankYou(room, socket.data.userId);
+        await broadcastRoomState(room);
+      } catch (err) {
+        socket.emit("error_message", (err as Error).message);
+      }
+    });
+
+    socket.on("hula_stop", async () => {
+      if (!roomCode) return;
+      const room = getRoom(roomCode);
+      if (!room) return;
+
+      try {
+        const result = callHulaStop(room, socket.data.userId);
+        io.to(roomCode).emit("hula_stop", {
+          playerId: socket.data.userId,
+          points: result.points,
+        });
+        await broadcastRoomState(room);
+        // 모두의 손패가 뒤집히는 연출을 다 보여준 뒤 결과 화면으로 넘어간다.
+        scheduleHulaGameOver(room, HULA_REVEAL_HOLD_MS + GAME_OVER_HOLD_MS);
       } catch (err) {
         socket.emit("error_message", (err as Error).message);
       }
@@ -840,7 +894,7 @@ app.prepare().then(() => {
         // 조합을 바닥에 내려놓는 소리를 클라이언트가 낼 수 있게 알린다.
         io.to(roomCode).emit("hula_meld", { playerId: socket.data.userId });
         await broadcastRoomState(room);
-        if (result.gameOver) scheduleHulaGameOver(room, GAME_OVER_HOLD_MS);
+        if (result.gameOver) finishHulaRound(room, roomCode);
       } catch (err) {
         socket.emit("error_message", (err as Error).message);
       }
@@ -857,7 +911,7 @@ app.prepare().then(() => {
           const result = appendToHulaMeld(room, socket.data.userId, meldId, cardId);
           io.to(roomCode).emit("hula_append", { playerId: socket.data.userId });
           await broadcastRoomState(room);
-          if (result.gameOver) scheduleHulaGameOver(room, GAME_OVER_HOLD_MS);
+          if (result.gameOver) finishHulaRound(room, roomCode);
         } catch (err) {
           socket.emit("error_message", (err as Error).message);
         }
@@ -878,9 +932,7 @@ app.prepare().then(() => {
           cards: [result.discarded],
         });
         await broadcastRoomState(room);
-        if (result.gameOver) {
-          scheduleHulaGameOver(room, cardsFlightMs(1) + GAME_OVER_HOLD_MS);
-        }
+        if (result.gameOver) finishHulaRound(room, code, cardsFlightMs(1));
       } catch (err) {
         socket.emit("error_message", (err as Error).message);
       }

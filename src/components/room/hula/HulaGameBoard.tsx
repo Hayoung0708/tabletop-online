@@ -1,30 +1,23 @@
 "use client";
 
 import { useEffect, useState, type JSX } from "react";
-import { getSocket } from "@/lib/socket";
 import { HulaOpponentRow } from "@/components/room/hula/HulaOpponentRow";
 import { HulaCenter } from "@/components/room/hula/HulaCenter";
 import { HulaMeldBoard } from "@/components/room/hula/HulaMeldBoard";
 import { HulaMyHand } from "@/components/room/hula/HulaMyHand";
 import { HulaFinishedPanel } from "@/components/room/hula/HulaFinishedPanel";
+import { YahtzeeCelebration } from "@/components/room/yatzy/YahtzeeCelebration";
 import { CenterAnnounceToast } from "@/components/room/CenterAnnounceToast";
 import { useHulaActions } from "@/hooks/hula/useHulaActions";
+import { useHulaSounds } from "@/hooks/hula/useHulaSounds";
+import { useHulaAnnouncements } from "@/hooks/hula/useHulaAnnouncements";
 import { useStarterAnnounce } from "@/hooks/shithead/useStarterAnnounce";
 import { useCenterAnnounce } from "@/hooks/useCenterAnnounce";
-import { setHandGrowSource } from "@/hooks/shithead/handGrowSource";
-import {
-  CARD_PLACE_SOUND_SRC,
-  CARD_TAKE_FROM_DECK_SOUND_SRC,
-  CARD_TAKE_FROM_PILE_SOUND_SRC,
-} from "@/constants/media";
-import { playSoundOnce } from "@/utils/sound";
-import { SHITHEAD_ANCHOR } from "@/constants/shithead";
+import { useYahtzeeCelebrations } from "@/hooks/yatzy/useYahtzeeCelebrations";
+import { HULA_DECK_DRAW_DELAY_MS, HULA_STOP_MAX_POINTS } from "@/constants/hula";
 import { canSelectTogether } from "@/server/hula/meld";
-import type { HulaDrawSource } from "@/server/hula/gameLogic";
+import { hulaHandPoints } from "@/server/hula/deck";
 import type { PublicRoomState } from "@/server/roomManager";
-
-/** 가져오기 소리·출발점 지정이 유효한 시간(ms) — 곧바로 오는 손패 증가에만 적용. */
-const DRAW_SOURCE_TTL_MS = 1200;
 
 export interface HulaGameBoardProps {
   state: PublicRoomState;
@@ -43,11 +36,24 @@ export const HulaGameBoard = ({
   state,
   userId,
 }: HulaGameBoardProps): JSX.Element | null => {
-  const { drawCard, registerMeld, appendCard, discardCard } = useHulaActions();
+  const { drawCard, registerMeld, appendCard, discardCard, cancelThankYou, callStop } =
+    useHulaActions();
   const { announce, showAnnounce } = useCenterAnnounce();
+  const { celebrations, addCelebration, removeCelebration } = useYahtzeeCelebrations();
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
 
   const game = state.game.type === "HULA" ? state.game : null;
+
+  // 차례가 넘어간 직후에는 덱을 잠가 둔다 — 그동안 다른 사람이 더미를
+  // 가져갈(땡큐) 기회를 준다. 서버도 같은 시간으로 막는다. 열린 차례를
+  // 기록해 두고 비교하면, 차례가 바뀌는 순간 따로 되돌리지 않아도 다시 잠긴다.
+  const turnKey = `${game?.currentPlayerId ?? ""}:${game?.movesMade ?? 0}`;
+  const [deckReadyTurnKey, setDeckReadyTurnKey] = useState("");
+  useEffect(() => {
+    const timer = setTimeout(() => setDeckReadyTurnKey(turnKey), HULA_DECK_DRAW_DELAY_MS);
+    return (): void => clearTimeout(timer);
+  }, [turnKey]);
+  const deckReady = deckReadyTurnKey === turnKey;
 
   /**
    * 게스트 id로 닉네임을 찾는다.
@@ -57,51 +63,12 @@ export const HulaGameBoard = ({
   const nicknameOf = (id: string): string =>
     state.players.find((p) => p.userId === id)?.nickname ?? "-";
 
-  // 가져온 카드는 덱/더미 어느 쪽에서 왔는지에 따라 출발점과 소리가 다르다.
-  useEffect(() => {
-    const socket = getSocket();
-    /**
-     * 가져오기 알림 — 이 플레이어의 다음 손패 증가 출발점과 소리를 지정한다.
-     * @param root0 - 이벤트 페이로드
-     * @param root0.playerId - 카드를 가져간 플레이어
-     * @param root0.source - 가져온 곳
-     */
-    const onDraw = ({
-      playerId,
-      source,
-    }: {
-      playerId: string;
-      source: HulaDrawSource;
-    }): void => {
-      const fromDiscard = source === "discard";
-      setHandGrowSource(
-        playerId,
-        fromDiscard ? SHITHEAD_ANCHOR.pile : SHITHEAD_ANCHOR.deck,
-        DRAW_SOURCE_TTL_MS,
-        fromDiscard ? CARD_TAKE_FROM_PILE_SOUND_SRC : CARD_TAKE_FROM_DECK_SOUND_SRC,
-      );
-    };
-    socket.on("hula_draw", onDraw);
-    return (): void => {
-      socket.off("hula_draw", onDraw);
-    };
-  }, []);
-
-  // 조합을 내려놓을 때(등록)와 남의 조합에 한 장 붙일 때의 소리.
-  useEffect(() => {
-    const socket = getSocket();
-    /** 조합 등록 — 여러 장을 한꺼번에 내려놓으니 더미 쓸어오는 소리를 쓴다. */
-    const onMeld = (): void => playSoundOnce(CARD_TAKE_FROM_PILE_SOUND_SRC);
-    /** 붙이기 — 카드 한 장이 바닥에 놓이는 소리. */
-    const onAppend = (): void => playSoundOnce(CARD_PLACE_SOUND_SRC);
-
-    socket.on("hula_meld", onMeld);
-    socket.on("hula_append", onAppend);
-    return (): void => {
-      socket.off("hula_meld", onMeld);
-      socket.off("hula_append", onAppend);
-    };
-  }, []);
+  useHulaSounds();
+  useHulaAnnouncements({
+    players: state.players,
+    showAnnounce,
+    onHula: addCelebration,
+  });
 
   // 게임이 시작된 순간(아직 아무도 수를 두지 않았을 때) 시작 플레이어를 알린다.
   useStarterAnnounce(
@@ -114,8 +81,15 @@ export const HulaGameBoard = ({
   const me = game.players.find((p) => p.userId === userId);
   if (!me) return null;
 
-  const isMyTurn = game.currentPlayerId === userId;
+  // 승자가 정해진 뒤에는 공개 연출만 남는다 — 조작은 전부 잠근다.
+  const isOver = game.winnerUserId !== null;
+  const isMyTurn = game.currentPlayerId === userId && !isOver;
   const dealIn = game.movesMade === 0;
+  const myThankYouCardId =
+    game.thankYou?.playerId === userId ? game.thankYou.cardId : null;
+  // 스톱은 카드를 가져오기 전에만 부를 수 있다.
+  const canStop =
+    isMyTurn && !game.hasDrawn && hulaHandPoints(me.hand ?? []) <= HULA_STOP_MAX_POINTS;
 
   /**
    * 손패 카드 선택을 토글한다. 지금 고른 카드들과 같이 등록할 수 없는 카드를
@@ -138,6 +112,12 @@ export const HulaGameBoard = ({
   /** 고른 카드들을 조합으로 등록한다. */
   const handleRegister = (): void => {
     registerMeld(selectedIds);
+    setSelectedIds([]);
+  };
+
+  /** 땡큐를 취소하고 차례를 원래 순서로 되돌린다. */
+  const handleCancelThankYou = (): void => {
+    cancelThankYou();
     setSelectedIds([]);
   };
 
@@ -203,7 +183,8 @@ export const HulaGameBoard = ({
           <HulaCenter
             deckCount={game.deckCount}
             discard={game.discard}
-            canDraw={isMyTurn && !game.hasDrawn}
+            canDrawDeck={isMyTurn && !game.hasDrawn && deckReady}
+            canDrawDiscard={!isOver && !game.hasDrawn && game.discard.length > 0}
             onDraw={drawCard}
           />
 
@@ -214,16 +195,31 @@ export const HulaGameBoard = ({
             isMyTurn={isMyTurn}
             hasDrawn={game.hasDrawn}
             dealIn={dealIn}
+            thankYouCardId={myThankYouCardId}
+            canStop={canStop}
             onToggleCard={toggleCard}
             onRegister={handleRegister}
             onDiscard={handleDiscard}
+            onCancelThankYou={handleCancelThankYou}
+            onStop={callStop}
           />
         </>
       )}
 
       {state.status === "FINISHED" && (
-        <HulaFinishedPanel players={state.players} hulaPlayers={game.players} />
+        <HulaFinishedPanel
+          players={state.players}
+          hulaPlayers={game.players}
+          stoppedByUserId={game.stoppedByUserId}
+        />
       )}
+
+      {celebrations.map((celebration) => (
+        <YahtzeeCelebration
+          key={celebration.id}
+          onDone={() => removeCelebration(celebration.id)}
+        />
+      ))}
 
       <CenterAnnounceToast announce={announce} />
     </>
