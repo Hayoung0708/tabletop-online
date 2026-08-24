@@ -62,7 +62,7 @@ export const HulaCenter = ({
       <p className="min-h-5 text-sm text-slate-400">
         {canDraw ? "덱이나 더미에서 한 장 가져오세요" : ""}
       </p>
-      <div className="flex items-start justify-center gap-6">
+      <div className="flex items-start justify-center gap-4 sm:gap-6">
         <div className="flex flex-col items-center gap-1.5">
           <div data-anchor={SHITHEAD_ANCHOR.deck}>
             {deckCount > 0 ? (

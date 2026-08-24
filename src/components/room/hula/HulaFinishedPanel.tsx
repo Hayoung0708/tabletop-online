@@ -13,11 +13,13 @@ export interface HulaFinishedPanelProps {
 const MEDAL_BY_RANK: Record<number, string> = { 1: "🥇", 2: "🥈", 3: "🥉" };
 
 /**
- * 훌라 종료 후 결과표. 벌점이 낮은 사람부터 보여준다.
+ * 훌라 종료 후 등수표. 손패에 남은 카드가 적은 사람부터 앞 등수를 받는다
+ * (점수는 등수를 매기는 데만 쓰고 화면에는 보여주지 않는다 — 다른 게임과
+ * 마찬가지로 등수·승수로만 이야기한다).
  * @param props - 참가자 정보
  * @param props.players
  * @param props.hulaPlayers
- * @returns 결과 패널 엘리먼트
+ * @returns 등수 패널 엘리먼트
  */
 export const HulaFinishedPanel = ({
   players,
@@ -35,7 +37,6 @@ export const HulaFinishedPanel = ({
             <li key={hp.userId}>
               <span className="mr-1">{MEDAL_BY_RANK[index + 1] ?? `${index + 1}등`}</span>
               {nickname}
-              <span className="ml-2 text-sm text-slate-400">벌점 {hp.score ?? 0}점</span>
             </li>
           );
         })}

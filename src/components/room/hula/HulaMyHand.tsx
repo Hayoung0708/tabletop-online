@@ -96,18 +96,18 @@ export const HulaMyHand = ({
         </div>
       </div>
 
-      <div className="flex w-full justify-center gap-2">
+      <div className="flex w-full flex-wrap justify-center gap-2">
         <button
           onClick={onRegister}
           disabled={!canRegister}
-          className="rounded-lg bg-indigo-600 px-6 py-2.5 text-base font-medium transition hover:bg-indigo-500 disabled:opacity-40"
+          className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium sm:px-6 sm:py-2.5 sm:text-base transition hover:bg-indigo-500 disabled:opacity-40"
         >
           등록
         </button>
         <button
           onClick={onDiscard}
           disabled={!canAct || selectedIds.length !== 1}
-          className="rounded-lg border border-slate-700 px-6 py-2.5 text-base font-medium transition hover:bg-slate-800 disabled:opacity-40"
+          className="rounded-lg border border-slate-700 px-4 py-2 text-sm font-medium sm:px-6 sm:py-2.5 sm:text-base transition hover:bg-slate-800 disabled:opacity-40"
         >
           버리기
         </button>

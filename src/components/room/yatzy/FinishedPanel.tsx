@@ -6,22 +6,16 @@ import type { PublicRoomState } from "@/server/roomManager";
 export interface FinishedPanelProps {
   players: PublicRoomState["players"];
   totals: Record<string, number>;
-  onLeaveRoom: () => void;
 }
 
 /**
  * 게임 종료 후 순위표.
- * @param props - 참가자 점수와 로비 이동 핸들러
+ * @param props - 참가자 점수
  * @param props.players
  * @param props.totals
- * @param props.onLeaveRoom
  * @returns 결과 패널 엘리먼트
  */
-export const FinishedPanel = ({
-  players,
-  totals,
-  onLeaveRoom,
-}: FinishedPanelProps): JSX.Element => {
+export const FinishedPanel = ({ players, totals }: FinishedPanelProps): JSX.Element => {
   const ranked = [...players].sort((a, b) => totals[b.userId] - totals[a.userId]);
 
   return (
@@ -35,12 +29,6 @@ export const FinishedPanel = ({
           </li>
         ))}
       </ol>
-      <button
-        onClick={onLeaveRoom}
-        className="mt-4 rounded-lg bg-indigo-600 px-6 py-2.5 text-sm font-medium transition hover:bg-indigo-500"
-      >
-        로비로 돌아가기
-      </button>
     </div>
   );
 };

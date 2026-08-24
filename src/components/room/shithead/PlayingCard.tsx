@@ -1,7 +1,7 @@
 "use client";
 
 import type { JSX } from "react";
-import { Club, Diamond, Heart, Spade } from "lucide-react";
+import { Club, Diamond, Drama, Heart, Spade } from "lucide-react";
 import type { Suit } from "@/server/shithead/deck";
 
 const SUIT_ICON: Record<Suit, typeof Club> = {
@@ -110,7 +110,14 @@ export const PlayingCard = ({
         onClick && !disabled ? "cursor-pointer hover:-translate-y-1" : "cursor-[inherit]"
       }`}
     >
-      {isJoker ? <span className="text-3xl">🃏</span> : <span>{card.rank}</span>}
+      {isJoker ? (
+        <>
+          <Drama className="h-6 w-6" />
+          <span className="text-[0.6rem] tracking-tight">JOCKER</span>
+        </>
+      ) : (
+        <span>{card.rank}</span>
+      )}
       {SuitIcon && <SuitIcon className="h-4 w-4" fill="currentColor" />}
     </button>
   );

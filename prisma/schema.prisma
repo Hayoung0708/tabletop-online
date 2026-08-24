@@ -15,9 +15,6 @@ datasource db {
 model Player {
   id        String   @id @default(cuid())
   nickname  String?
-  // Games won across every game type, kept on the guest id so it survives
-  // switching games and rejoining rooms.
-  wins      Int      @default(0)
   createdAt DateTime @default(now())
 
   roomPlayers RoomPlayer[]
@@ -49,6 +46,9 @@ model RoomPlayer {
   playerId String
   seat     Int
   score    Int?
+  // Games won in this room (any game type). Room-scoped — leaving the room
+  // and joining another starts from zero again.
+  wins     Int      @default(0)
   joinedAt DateTime @default(now())
 
   room   Room   @relation(fields: [roomId], references: [id], onDelete: Cascade)

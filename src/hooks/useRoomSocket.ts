@@ -109,8 +109,8 @@ export const useRoomSocket = (
         ...prev.filter((e) => e.userId !== fromUserId),
         { id: emoteIdSeq, userId: fromUserId, emoteId },
       ]);
-      const audio = EMOTES.find((e) => e.id === emoteId)?.audio;
-      if (audio) playRandomSound(audio);
+      const emote = EMOTES.find((e) => e.id === emoteId);
+      if (emote?.audio) playRandomSound(emote.audio, emote.audioVolume);
     };
 
     socket.on("connect", join);
@@ -118,7 +118,10 @@ export const useRoomSocket = (
     socket.on("error_message", onError);
     socket.on("emote", onEmote);
 
+    // 이미 붙어 있으면 바로 참가를, 어쩌다 끊긴 소켓이면 다시 붙인다 — 재연결
+    // 신호가 없으면 "방에 연결하는 중"에서 영영 멈춘다.
     if (socket.connected) join();
+    else socket.connect();
 
     return (): void => {
       socket.off("connect", join);

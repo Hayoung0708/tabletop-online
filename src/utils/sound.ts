@@ -19,9 +19,12 @@ export const pickRandomDiceSounds = (count: number): string[] => {
 /**
  * 오디오 파일 하나를 재생한다. 자동재생이 브라우저 정책으로 막혀도 조용히 무시한다.
  * @param src - 재생할 오디오 파일 경로
+ * @param volume - 재생 음량(0~1). 기본은 원본 그대로
  */
-export const playSound = (src: string): void => {
-  new Audio(src).play().catch(() => {});
+export const playSound = (src: string, volume = 1): void => {
+  const audio = new Audio(src);
+  audio.volume = volume;
+  audio.play().catch(() => {});
 };
 
 /** 같은 소리가 이 시간(ms) 안에 또 요청되면 무시한다. 카드 이동 간격(최소 170ms)보다 짧게 잡는다. */
@@ -45,10 +48,11 @@ export const playSoundOnce = (src: string): void => {
 /**
  * 오디오 소스 하나 또는 후보 목록을 받아 재생한다. 목록이면 무작위로 하나 고른다.
  * @param src - 오디오 파일 경로 또는 후보 목록
+ * @param volume - 재생 음량(0~1). 기본은 원본 그대로
  */
-export const playRandomSound = (src: string | readonly string[]): void => {
+export const playRandomSound = (src: string | readonly string[], volume = 1): void => {
   const picked = Array.isArray(src) ? src[Math.floor(Math.random() * src.length)] : src;
-  playSound(picked);
+  playSound(picked, volume);
 };
 
 /**

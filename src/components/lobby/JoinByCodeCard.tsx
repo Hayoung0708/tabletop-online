@@ -33,12 +33,12 @@ export const JoinByCodeCard = ({
           onChange={(e) => onJoinCodeChange(e.target.value.toUpperCase())}
           placeholder="방 코드 입력"
           maxLength={ROOM_CODE_LENGTH}
-          className="flex-1 rounded-lg bg-slate-800 px-4 py-2.5 tracking-widest uppercase outline-none ring-1 ring-slate-700 focus:ring-indigo-500"
+          className="min-w-0 flex-1 rounded-lg bg-slate-800 px-3 py-2.5 tracking-widest uppercase outline-none ring-1 ring-slate-700 focus:ring-indigo-500 sm:px-4"
         />
         <button
           onClick={() => joinCode && onJoin(joinCode)}
           disabled={joinCode.length < MIN_JOIN_CODE_LENGTH}
-          className="rounded-lg bg-slate-700 px-4 py-2.5 font-medium transition hover:bg-slate-600 disabled:opacity-50"
+          className="shrink-0 rounded-lg bg-slate-700 px-4 py-2.5 font-medium whitespace-nowrap transition hover:bg-slate-600 disabled:opacity-50"
         >
           참가
         </button>

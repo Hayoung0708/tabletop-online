@@ -187,7 +187,9 @@ export const PlayerSidebar = ({
   onRemoveEmote,
 }: PlayerSidebarProps): JSX.Element => {
   return (
-    <aside className="hidden w-72 shrink-0 flex-col gap-3 overflow-y-auto border-r border-slate-800 px-4 py-4 sm:flex">
+    // 모바일(세로 화면)에서는 옆에 둘 자리가 없어 위쪽 가로 줄로 눕힌다.
+    // 참가자 카드가 가로로 늘어서고, 감정표현은 그 오른쪽 끝에 붙는다.
+    <aside className="flex w-full shrink-0 gap-2 overflow-x-auto border-b border-slate-800 px-3 py-2 lg:w-72 lg:flex-col lg:gap-3 lg:overflow-x-visible lg:overflow-y-auto lg:border-r lg:border-b-0 lg:px-4 lg:py-4">
       {players.map((p) => {
         const extra = extraLine?.(p.userId) ?? null;
         const activeEmote = activeEmotes.find((e) => e.userId === p.userId) ?? null;
@@ -197,7 +199,9 @@ export const PlayerSidebar = ({
         return (
           <div
             key={p.userId}
-            className={`flex items-center justify-between gap-2 overflow-hidden rounded-lg border px-4 py-3 text-base transition ${
+            // 좁은 화면(가로 줄)에서는 폭을 고정한다 — 방장 왕관 유무에 따라 카드
+            // 폭이 들쭉날쭉하면 줄이 지저분해진다.
+            className={`flex w-48 shrink-0 items-center justify-between gap-2 overflow-hidden rounded-lg border px-3 py-2 text-sm transition sm:px-4 sm:py-3 sm:text-base lg:w-auto ${
               p.userId === currentPlayerId
                 ? "border-indigo-500 bg-indigo-600"
                 : "border-slate-800 bg-slate-900/60"
@@ -240,10 +244,12 @@ export const PlayerSidebar = ({
           </div>
         );
       })}
-      <div className="mt-auto flex flex-col gap-1">
-        <span className="text-base font-medium text-slate-400">감정표현</span>
-        <div className="flex flex-col gap-1.5">
-          <div className="flex gap-1.5">
+      <div className="flex shrink-0 flex-col gap-1 lg:mt-auto">
+        <span className="hidden text-base font-medium text-slate-400 lg:block">
+          감정표현
+        </span>
+        <div className="flex min-h-0 flex-1 gap-1.5 lg:flex-none lg:flex-col">
+          <div className="flex h-full gap-1.5">
             {EMOTES.slice(0, 1).map((emote) => (
               <EmoteButton
                 key={emote.id}
@@ -251,11 +257,11 @@ export const PlayerSidebar = ({
                 onCooldown={emoteOnCooldown[emote.id] ?? false}
                 onClick={() => onSendEmote(emote.id)}
                 iconClassName="h-9 w-9"
-                className="flex-1 py-2 text-2xl"
+                className="aspect-square h-full w-auto text-2xl lg:aspect-auto lg:h-auto lg:w-auto lg:flex-1 lg:py-2"
               />
             ))}
           </div>
-          <div className="flex gap-1.5">
+          <div className="flex h-full gap-1.5">
             {EMOTES.slice(1).map((emote) => (
               <EmoteButton
                 key={emote.id}
@@ -263,7 +269,7 @@ export const PlayerSidebar = ({
                 onCooldown={emoteOnCooldown[emote.id] ?? false}
                 onClick={() => onSendEmote(emote.id)}
                 iconClassName="h-[4.5rem] w-[4.5rem]"
-                className="flex-1 py-4 text-3xl"
+                className="aspect-square h-full w-auto text-3xl lg:aspect-auto lg:h-auto lg:w-auto lg:flex-1 lg:py-4"
               />
             ))}
           </div>

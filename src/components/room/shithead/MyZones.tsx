@@ -92,7 +92,9 @@ export const MyZones = ({
     <div className="flex flex-col items-start gap-3 rounded-xl border border-slate-800 bg-slate-900/40 px-3 pt-3 pb-4">
       <div
         data-anchor={SHITHEAD_ANCHOR.field(userId)}
-        className="flex w-full items-end gap-6"
+        // 좁은 화면에서는 바닥패/얼굴패를 손패 위로 올린다 — 옆에 나란히 두면
+        // 손패 폭이 절반 이하로 줄어 카드가 겹쳐 못 알아본다.
+        className="flex w-full flex-col items-start gap-2 sm:flex-row sm:items-end sm:gap-6"
       >
         <FaceCardSlots
           faceUp={faceUp}
@@ -106,7 +108,7 @@ export const MyZones = ({
         <div
           data-anchor={SHITHEAD_ANCHOR.hand(userId)}
           data-hand-align="end"
-          className="flex min-h-[5.625rem] min-w-0 flex-1 items-end sm:min-h-[6.625rem]"
+          className="flex min-h-[5.625rem] w-full min-w-0 flex-1 items-end sm:min-h-[6.625rem]"
         >
           {/* 손패가 0장이어도(블라인드 단계) 항상 마운트해 둔다 — 조건부로
               마운트하면 훅이 매번 새로 시작해 "0장→첫 카드" 전환에서 비교할
@@ -127,18 +129,18 @@ export const MyZones = ({
       </div>
 
       {!isBlindPhase && (
-        <div className="flex w-full justify-center gap-2">
+        <div className="flex w-full flex-wrap justify-center gap-2">
           <button
             onClick={handlePlay}
             disabled={!isMyTurn || selectedIds.length === 0}
-            className="rounded-lg bg-indigo-600 px-6 py-2.5 text-base font-medium transition hover:bg-indigo-500 disabled:opacity-40"
+            className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium sm:px-6 sm:py-2.5 sm:text-base transition hover:bg-indigo-500 disabled:opacity-40"
           >
             내기
           </button>
           <button
             onClick={onPickUpPile}
             disabled={!canPickUp}
-            className="rounded-lg border border-slate-700 px-6 py-2.5 text-base font-medium transition hover:bg-slate-800 disabled:opacity-40"
+            className="rounded-lg border border-slate-700 px-4 py-2 text-sm font-medium sm:px-6 sm:py-2.5 sm:text-base transition hover:bg-slate-800 disabled:opacity-40"
           >
             줍기
           </button>

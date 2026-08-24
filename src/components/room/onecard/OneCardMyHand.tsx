@@ -131,18 +131,18 @@ export const OneCardMyHand = ({
         </div>
       </div>
 
-      <div className="flex w-full justify-center gap-2">
+      <div className="flex w-full flex-wrap justify-center gap-2">
         <button
           onClick={handlePlay}
           disabled={!isMyTurn || selectedId === null}
-          className="rounded-lg bg-indigo-600 px-6 py-2.5 text-base font-medium transition hover:bg-indigo-500 disabled:opacity-40"
+          className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium sm:px-6 sm:py-2.5 sm:text-base transition hover:bg-indigo-500 disabled:opacity-40"
         >
           내기
         </button>
         <button
           onClick={onDraw}
           disabled={!isMyTurn}
-          className="rounded-lg border border-slate-700 px-6 py-2.5 text-base font-medium transition hover:bg-slate-800 disabled:opacity-40"
+          className="rounded-lg border border-slate-700 px-4 py-2 text-sm font-medium sm:px-6 sm:py-2.5 sm:text-base transition hover:bg-slate-800 disabled:opacity-40"
         >
           {attackStack > 0 ? `${attackStack}장 먹기` : "카드 먹기"}
         </button>
@@ -151,7 +151,7 @@ export const OneCardMyHand = ({
         {callPending && (
           <button
             onClick={onCall}
-            className="rounded-lg bg-amber-500 px-6 py-2.5 text-base font-bold text-amber-950 transition hover:bg-amber-400"
+            className="rounded-lg bg-amber-500 px-4 py-2 text-sm font-bold sm:px-6 sm:py-2.5 sm:text-base text-amber-950 transition hover:bg-amber-400"
           >
             원카드!
           </button>
