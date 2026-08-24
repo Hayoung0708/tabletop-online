@@ -50,7 +50,9 @@ export const DiceTray = ({
 
   return (
     <div className="flex flex-col items-center gap-3 rounded-xl border border-slate-800 bg-slate-900/40 px-3 py-3 sm:px-4">
-      <div className="flex w-full justify-center gap-2 sm:gap-4">
+      {/* 주사위는 크기가 고정이라 폭이 좁으면 트레이를 넘친다 — 줄여서 뭉개는
+          대신 줄바꿈으로 흘려보낸다. */}
+      <div className="flex w-full flex-wrap justify-center gap-2 sm:gap-4">
         {dice.map((value, i) => (
           <Die
             key={i}
