@@ -12,8 +12,10 @@ const EMPTY_SLOT_CLASS =
 export interface HulaCenterProps {
   deckCount: number;
   discard: HulaCard[];
-  /** 지금 카드를 가져올 수 있는지 (내 차례이고 아직 안 가져왔을 때). */
-  canDraw: boolean;
+  /** 덱에서 가져올 수 있는지 — 내 차례이고, 땡큐 대기 시간이 지난 뒤. */
+  canDrawDeck: boolean;
+  /** 더미에서 가져올 수 있는지(땡큐) — 아직 아무도 안 가져갔으면 누구나. */
+  canDrawDiscard: boolean;
   onDraw: (source: HulaDrawSource) => void;
 }
 
@@ -23,14 +25,17 @@ export interface HulaCenterProps {
  * @param props - 덱·더미 상태와 가져오기 콜백
  * @param props.deckCount
  * @param props.discard
- * @param props.canDraw
+ * @param props.isMyTurn - 지금이 내 차례인지
+ * @param props.canDrawDeck - 덱을 누를 수 있는지
+ * @param props.canDrawDiscard - 더미를 누를 수 있는지
  * @param props.onDraw
  * @returns 가운데 영역 엘리먼트
  */
 export const HulaCenter = ({
   deckCount,
   discard,
-  canDraw,
+  canDrawDeck,
+  canDrawDiscard,
   onDraw,
 }: HulaCenterProps): JSX.Element => {
   // 렌더 단계에서 더미 증가를 즉시 감지해 새 top을 감춘다 — 그러지 않으면
@@ -60,7 +65,11 @@ export const HulaCenter = ({
   return (
     <div className="flex flex-col items-center gap-2 py-4">
       <p className="min-h-5 text-sm text-slate-400">
-        {canDraw ? "덱이나 더미에서 한 장 가져오세요" : ""}
+        {canDrawDeck
+          ? "덱이나 더미에서 한 장 가져오세요"
+          : canDrawDiscard
+            ? "더미를 가져가면 땡큐입니다"
+            : ""}
       </p>
       <div className="flex items-start justify-center gap-4 sm:gap-6">
         <div className="flex flex-col items-center gap-1.5">
@@ -68,7 +77,7 @@ export const HulaCenter = ({
             {deckCount > 0 ? (
               <PlayingCard
                 faceDown
-                onClick={canDraw ? (): void => onDraw("deck") : undefined}
+                onClick={canDrawDeck ? (): void => onDraw("deck") : undefined}
               />
             ) : (
               <div className={EMPTY_SLOT_CLASS} />
@@ -87,7 +96,7 @@ export const HulaCenter = ({
                 <PlayingCard
                   key={top.id}
                   card={top}
-                  onClick={canDraw ? (): void => onDraw("discard") : undefined}
+                  onClick={canDrawDiscard ? (): void => onDraw("discard") : undefined}
                 />
               </div>
             )}

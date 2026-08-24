@@ -24,7 +24,10 @@ export interface HulaCard {
   suit: Suit;
 }
 
-/** 벌점 계산에 쓰는 랭크별 점수 — 숫자는 액면, J·Q·K는 10, A는 1. */
+/**
+ * 점수 계산에 쓰는 랭크별 값 — A는 1, 숫자는 액면, J·Q·K는 11·12·13.
+ * 7은 혼자서도 등록할 수 있어 손에 쥐고 있으면 손해가 커야 하므로 15로 센다.
+ */
 const PENALTY_POINTS: Record<HulaRank, number> = {
   A: 1,
   "2": 2,
@@ -32,13 +35,13 @@ const PENALTY_POINTS: Record<HulaRank, number> = {
   "4": 4,
   "5": 5,
   "6": 6,
-  "7": 7,
+  "7": 15,
   "8": 8,
   "9": 9,
   "10": 10,
-  J: 10,
-  Q: 10,
-  K: 10,
+  J: 11,
+  Q: 12,
+  K: 13,
 };
 
 /**
