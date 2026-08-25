@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState, type JSX } from "react";
+import { CARD_ROW_MIN_H_CLASS, HAND_FAB_CLEARANCE_CLASS } from "@/constants/card";
 import { PlayingCard } from "@/components/room/shithead/PlayingCard";
 import { CardFan } from "@/components/room/shithead/CardFan";
 import { SHITHEAD_ANCHOR } from "@/constants/shithead";
@@ -90,7 +91,7 @@ export const HulaMyHand = ({
         <div
           data-anchor={SHITHEAD_ANCHOR.hand(userId)}
           data-hand-align="end"
-          className="flex min-h-[5.625rem] min-w-0 flex-1 items-end sm:min-h-[6.625rem]"
+          className={`flex ${CARD_ROW_MIN_H_CLASS} ${HAND_FAB_CLEARANCE_CLASS} min-w-0 flex-1 items-end`}
         >
           <CardFan
             cardKeys={ordered.map((c) => c.id)}

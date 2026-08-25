@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState, type JSX } from "react";
+import { CARD_ROW_MIN_H_CLASS } from "@/constants/card";
 import { PlayingCard } from "@/components/room/shithead/PlayingCard";
 import { FaceCardSlots } from "@/components/room/shithead/FaceCardSlots";
 import { CardFan } from "@/components/room/shithead/CardFan";
@@ -92,9 +93,9 @@ export const MyZones = ({
     <div className="flex flex-col items-start gap-3 rounded-xl border border-slate-800 bg-slate-900/40 px-3 pt-3 pb-4">
       <div
         data-anchor={SHITHEAD_ANCHOR.field(userId)}
-        // 좁은 화면에서는 바닥패/얼굴패를 손패 위로 올린다 — 옆에 나란히 두면
-        // 손패 폭이 절반 이하로 줄어 카드가 겹쳐 못 알아본다.
-        className="flex w-full flex-col items-start gap-2 sm:flex-row sm:items-end sm:gap-6"
+        // 바닥패/얼굴패와 손패는 항상 한 줄이다. 좁은 화면에서는 카드 자체가
+        // 작아져서(CARD_SIZE_CLASS) 둘을 나란히 놓아도 손패가 뭉개지지 않는다.
+        className="flex w-full items-end gap-2 sm:gap-6"
       >
         <FaceCardSlots
           faceUp={faceUp}
@@ -108,7 +109,7 @@ export const MyZones = ({
         <div
           data-anchor={SHITHEAD_ANCHOR.hand(userId)}
           data-hand-align="end"
-          className="flex min-h-[5.625rem] w-full min-w-0 flex-1 items-end sm:min-h-[6.625rem]"
+          className={`flex ${CARD_ROW_MIN_H_CLASS} w-full min-w-0 flex-1 items-end`}
         >
           {/* 손패가 0장이어도(블라인드 단계) 항상 마운트해 둔다 — 조건부로
               마운트하면 훅이 매번 새로 시작해 "0장→첫 카드" 전환에서 비교할

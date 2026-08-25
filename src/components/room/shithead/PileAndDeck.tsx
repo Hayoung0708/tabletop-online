@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, type JSX } from "react";
+import { CARD_SLOT_SIZE_CLASS } from "@/constants/card";
 import { getSocket } from "@/lib/socket";
 import { PlayingCard } from "@/components/room/shithead/PlayingCard";
 import {
@@ -24,8 +25,7 @@ const SPREAD_STEP_PX = 22;
 const SEVEN_REVEAL_PX = 30;
 
 // 카드와 같은 치수 — 덱/더미도 손패와 똑같은 크기로 그린다.
-const EMPTY_SLOT_CLASS =
-  "flex h-20 w-14 items-center justify-center rounded-lg border-2 border-dashed border-slate-700 sm:h-24 sm:w-16";
+const EMPTY_SLOT_CLASS = `flex items-center justify-center rounded-lg border-2 border-dashed border-slate-700 ${CARD_SLOT_SIZE_CLASS}`;
 
 /**
  * 가운데에 놓인 뽑을 덱과 버려진 더미(맨 위 카드만 보임). 각각 몇 장
@@ -124,7 +124,7 @@ export const PileAndDeck = ({
       <div className="flex flex-col items-center gap-1.5">
         <div
           data-anchor={SHITHEAD_ANCHOR.pile}
-          className="relative h-20 w-14 sm:h-24 sm:w-16"
+          className={`relative ${CARD_SLOT_SIZE_CLASS}`}
           onMouseEnter={(): void => setHovered(true)}
           onMouseLeave={(): void => setHovered(false)}
         >

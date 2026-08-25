@@ -1,10 +1,11 @@
 "use client";
 
 import { useRef, type JSX } from "react";
+import { CARD_ROW_MIN_H_CLASS } from "@/constants/card";
 import { PlayingCard } from "@/components/room/shithead/PlayingCard";
 import { useHandGrowIn } from "@/hooks/shithead/useHandGrowIn";
 import { useHandDealInOnMount } from "@/hooks/shithead/useHandDealInOnMount";
-import { useMeasuredWidth } from "@/hooks/useMeasuredWidth";
+import { useHandMetrics } from "@/hooks/shithead/useHandMetrics";
 import { SHITHEAD_ANCHOR } from "@/constants/shithead";
 import { computeHandMargin } from "@/utils/shithead";
 import type { PublicOneCardPlayer } from "@/server/onecard/gameLogic";
@@ -36,7 +37,6 @@ export const OneCardOpponentRow = ({
 }: OneCardOpponentRowProps): JSX.Element => {
   const handRef = useRef<HTMLDivElement>(null);
   // 손패 영역 폭을 재서 카드가 많아지면 겹침을 강하게 줘 넘치지 않게 한다.
-  const [, handWidth] = useMeasuredWidth(handRef);
   // 게임 시작 직후에는 손패가 덱에서 날아드는 딜 연출을 재생한다.
   useHandDealInOnMount(handRef, dealIn);
 
@@ -46,7 +46,8 @@ export const OneCardOpponentRow = ({
     String(player.handCount - i),
   );
   useHandGrowIn(handRef, handKeys, player.userId, true);
-  const handMarginPx = computeHandMargin(handKeys.length, handWidth);
+  const { width: handWidth, cardWidth } = useHandMetrics(handRef, handKeys.length);
+  const handMarginPx = computeHandMargin(handKeys.length, handWidth, cardWidth);
 
   return (
     <div
@@ -73,7 +74,7 @@ export const OneCardOpponentRow = ({
           ref={handRef}
           data-anchor={SHITHEAD_ANCHOR.hand(player.userId)}
           data-hand-align="start"
-          className="relative z-50 flex min-h-[5.625rem] min-w-0 flex-1 sm:min-h-[6.625rem]"
+          className={`relative z-50 flex ${CARD_ROW_MIN_H_CLASS} min-w-0 flex-1`}
         >
           {handKeys.map((key, index) => (
             <div

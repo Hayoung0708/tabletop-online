@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, type JSX } from "react";
+import { CARD_SLOT_SIZE_CLASS } from "@/constants/card";
 import { Club, Diamond, Heart, RotateCcw, RotateCw, Spade, Swords } from "lucide-react";
 import { PlayingCard } from "@/components/room/shithead/PlayingCard";
 import { CARD_FLIGHT_DURATION_MS, SHITHEAD_ANCHOR } from "@/constants/shithead";
@@ -18,8 +19,7 @@ export interface OneCardCenterProps {
   onDraw: () => void;
 }
 
-const EMPTY_SLOT_CLASS =
-  "flex h-20 w-14 items-center justify-center rounded-lg border-2 border-dashed border-slate-700 sm:h-24 sm:w-16";
+const EMPTY_SLOT_CLASS = `flex items-center justify-center rounded-lg border-2 border-dashed border-slate-700 ${CARD_SLOT_SIZE_CLASS}`;
 
 const SUIT_ICON: Record<Suit, typeof Club> = {
   clubs: Club,
@@ -119,7 +119,7 @@ export const OneCardCenter = ({
         <div className="flex flex-col items-center gap-1.5">
           <div
             data-anchor={SHITHEAD_ANCHOR.pile}
-            className="relative h-20 w-14 sm:h-24 sm:w-16"
+            className={`relative ${CARD_SLOT_SIZE_CLASS}`}
           >
             <div className={EMPTY_SLOT_CLASS} />
             {topCard && (
