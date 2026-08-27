@@ -74,7 +74,7 @@ export const ShitheadGameBoard = ({
         <>
           <div className="flex flex-col gap-2">
             {opponentRows.map((row) => (
-              <div key={row[0].userId} className="flex gap-2">
+              <div key={row[0].userId} className="flex flex-col gap-2 sm:flex-row">
                 {row.map((p) => (
                   <div key={p.userId} className="min-w-0 flex-1">
                     <OpponentRow

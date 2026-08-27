@@ -9,6 +9,7 @@ import {
   FACE_DOWN_FLIP_MS,
   SHITHEAD_ANCHOR,
 } from "@/constants/shithead";
+import { CARD_SLOT_SIZE_CLASS } from "@/constants/card";
 import type { Card } from "@/server/shithead/deck";
 
 export interface FaceCardSlotsProps {
@@ -24,8 +25,7 @@ export interface FaceCardSlotsProps {
 }
 
 // 빈 자리(바닥패를 냄) 표시 — 덱/더미가 비었을 때와 같은 점선 박스.
-const EMPTY_SLOT_CLASS =
-  "absolute top-2.5 left-0 h-20 w-14 rounded-lg border-2 border-dashed border-slate-700 sm:h-24 sm:w-16";
+const EMPTY_SLOT_CLASS = `absolute top-2.5 left-0 rounded-lg border-2 border-dashed border-slate-700 ${CARD_SLOT_SIZE_CLASS}`;
 
 export interface FaceDownFlipCardProps {
   card: Card;
@@ -95,7 +95,7 @@ export const FaceCardSlots = ({
   const reveal = useFaceDownReveal(anchorUserId, faceDown);
 
   return (
-    <div className="flex gap-2">
+    <div className="flex gap-1 sm:gap-2">
       {faceDown.map((filled, i) => {
         const topCard = i < faceUp.length ? faceUp[i] : undefined;
         const revealing = reveal?.index === i ? reveal : null;
@@ -105,7 +105,7 @@ export const FaceCardSlots = ({
             data-anchor={
               anchorUserId ? SHITHEAD_ANCHOR.faceDownSlot(anchorUserId, i) : undefined
             }
-            className="relative h-[5.625rem] w-14 shrink-0 sm:h-[6.625rem] sm:w-16"
+            className="relative h-[4.625rem] w-11 shrink-0 sm:h-[5.625rem] sm:w-14 md:h-[6.625rem] md:w-16"
           >
             {!dealing && revealing && <FaceDownFlipCard card={revealing.card} />}
             {!dealing && !revealing && !filled && !topCard && (

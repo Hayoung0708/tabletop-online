@@ -2,6 +2,7 @@
 
 import type { JSX } from "react";
 import { Club, Diamond, Drama, Heart, Spade } from "lucide-react";
+import { CARD_SIZE_CLASS } from "@/constants/card";
 import type { Suit } from "@/server/shithead/deck";
 
 const SUIT_ICON: Record<Suit, typeof Club> = {
@@ -40,7 +41,7 @@ const CARD_BASE_CLASS =
 
 // 카드는 어디서나 같은 크기다 — 덱/더미만 크게 그리면 손패에서 날아갈 때
 // 확대·축소가 필요해지고, 글자와 아이콘 비율이 미묘하게 달라 티가 난다.
-const SIZE_CLASS = "h-20 w-14 text-lg sm:h-24 sm:w-16";
+const SIZE_CLASS = `${CARD_SIZE_CLASS} text-base sm:text-lg`;
 
 const FACE_DOWN_ACTIVE_CLASS =
   "border-indigo-700 bg-indigo-900 bg-[repeating-linear-gradient(45deg,theme(colors.indigo.800),theme(colors.indigo.800)_4px,theme(colors.indigo.900)_4px,theme(colors.indigo.900)_8px)]";

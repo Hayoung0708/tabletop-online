@@ -1,10 +1,11 @@
 "use client";
 
 import { useRef, type CSSProperties, type JSX } from "react";
+import { CARD_ROW_MIN_H_CLASS } from "@/constants/card";
 import { PlayingCard } from "@/components/room/shithead/PlayingCard";
 import { useHandGrowIn } from "@/hooks/shithead/useHandGrowIn";
 import { useHandDealInOnMount } from "@/hooks/shithead/useHandDealInOnMount";
-import { useMeasuredWidth } from "@/hooks/useMeasuredWidth";
+import { useHandMetrics } from "@/hooks/shithead/useHandMetrics";
 import { SHITHEAD_ANCHOR } from "@/constants/shithead";
 import { computeHandMargin } from "@/utils/shithead";
 import { HULA_REVEAL_DURATION_MS, HULA_REVEAL_STAGGER_MS } from "@/constants/hula";
@@ -47,7 +48,6 @@ export const HulaOpponentRow = ({
   dealIn,
 }: HulaOpponentRowProps): JSX.Element => {
   const handRef = useRef<HTMLDivElement>(null);
-  const [, handWidth] = useMeasuredWidth(handRef);
   useHandDealInOnMount(handRef, dealIn);
 
   // 상대 손패는 뒷면이라 카드 구분이 없다 — 오른쪽 끝 기준 키를 매기면
@@ -59,7 +59,8 @@ export const HulaOpponentRow = ({
   // 카드를 뒤집는 연출로 보여준다.
   const revealedHand = player.hand;
   useHandGrowIn(handRef, handKeys, player.userId, true);
-  const handMarginPx = computeHandMargin(handKeys.length, handWidth);
+  const { width: handWidth, cardWidth } = useHandMetrics(handRef, handKeys.length);
+  const handMarginPx = computeHandMargin(handKeys.length, handWidth, cardWidth);
 
   return (
     <div
@@ -88,7 +89,7 @@ export const HulaOpponentRow = ({
           data-hand-align="start"
           // 공개된 손패는 겹치면 숫자가 가려 확인할 수 없다 — 겹침을 풀고
           // 줄바꿈으로 전부 보여준다.
-          className={`relative z-50 flex min-h-[5.625rem] min-w-0 flex-1 sm:min-h-[6.625rem] ${
+          className={`relative z-50 flex ${CARD_ROW_MIN_H_CLASS} min-w-0 flex-1 ${
             revealedHand ? "flex-wrap gap-1" : ""
           }`}
         >

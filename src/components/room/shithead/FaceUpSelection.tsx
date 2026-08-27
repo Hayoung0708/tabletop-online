@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, type JSX } from "react";
+import { CARD_ROW_MIN_H_CLASS } from "@/constants/card";
 import { PlayingCard } from "@/components/room/shithead/PlayingCard";
 import { FaceCardSlots } from "@/components/room/shithead/FaceCardSlots";
 import { CardFan } from "@/components/room/shithead/CardFan";
@@ -56,7 +57,7 @@ export const FaceUpSelection = ({
         <div
           data-anchor={SHITHEAD_ANCHOR.hand(userId)}
           data-hand-align="end"
-          className="flex min-h-[5.625rem] min-w-0 flex-1 items-end sm:min-h-[6.625rem]"
+          className={`flex ${CARD_ROW_MIN_H_CLASS} min-w-0 flex-1 items-end`}
         >
           <CardFan dealInOnStart>
             {hand.map((card) => (

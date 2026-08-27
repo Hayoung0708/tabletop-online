@@ -8,6 +8,7 @@ import { AdRail } from "@/components/room/AdRail";
 import { RoomHeader } from "@/components/room/RoomHeader";
 import { NicknameForm } from "@/components/room/NicknameForm";
 import { PlayerSidebar } from "@/components/room/PlayerSidebar";
+import { EmoteFab } from "@/components/room/EmoteFab";
 import { WaitingPanel } from "@/components/room/WaitingPanel";
 import { Rulebook, RulebookAccordion } from "@/components/room/Rulebook";
 import { LeaveConfirmDialog } from "@/components/room/LeaveConfirmDialog";
@@ -220,6 +221,11 @@ export const RoomClient = ({ code, roomName, userId }: RoomClientProps): JSX.Ele
 
       {/* 카드 비행 오버레이는 싯헤드·원카드·훌라가 같이 쓴다 (앵커·이벤트 공용). */}
       {joined && state && state.game.type !== "YATZY" && <ShitheadCardMotions />}
+
+      {/* 좁은 화면에는 사이드바에 감정표현 자리가 없어 떠 있는 버튼으로 대신한다. */}
+      {joined && state && (
+        <EmoteFab onSendEmote={sendEmote} emoteOnCooldown={emoteOnCooldown} />
+      )}
 
       {copied && (
         <div
