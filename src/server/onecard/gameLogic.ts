@@ -1,4 +1,9 @@
-import type { RoomState } from "@/server/roomManager";
+import {
+  removePlayer,
+  shiftTurnIndex,
+  type PlayerLeftResult,
+  type RoomState,
+} from "@/server/roomManager";
 import type { Suit } from "@/server/shithead/deck";
 import {
   attackValueOf,
@@ -449,6 +454,43 @@ const rankOf = (
 export const oneCardRankOf = (room: RoomState, userId: string): number => {
   const game = asOneCardGame(room);
   return rankOf(room, game, userId) ?? room.players.length;
+};
+
+/**
+ * 게임 도중 나간 사람을 판에서 뺀다. 손패는 섞어서 덱 맨 아래(배열 앞쪽 —
+ * 뽑기는 뒤에서 pop한다)로 되돌리고, 이미 낸 카드는 더미에 그대로 둔다.
+ * 그 사람 차례였으면 다음 사람에게 넘긴다.
+ * @param room - 대상 방
+ * @param userId - 나간 게스트 id
+ * @returns 판이 끝났는지 여부
+ */
+export const removeOneCardPlayer = (
+  room: RoomState,
+  userId: string,
+): PlayerLeftResult => {
+  const game = asOneCardGame(room);
+
+  game.deck = [...shuffle(game.hands[userId] ?? []), ...game.deck];
+  delete game.hands[userId];
+  game.finishedOrder = game.finishedOrder.filter((id) => id !== userId);
+  game.bankruptOrder = game.bankruptOrder.filter((id) => id !== userId);
+  if (game.pendingCallPlayerId === userId) game.pendingCallPlayerId = null;
+
+  const removedIndex = removePlayer(room, userId);
+  game.currentPlayerIndex = shiftTurnIndex(
+    game.currentPlayerIndex,
+    removedIndex,
+    room.players.length,
+  );
+
+  if (settleIfGameOver(room, game)) return { gameOver: true };
+
+  // 보정된 자리가 이미 완주·파산한 사람을 가리킬 수 있다 — 다음 사람으로 민다.
+  if (!isActive(game, room.players[game.currentPlayerIndex].userId)) {
+    game.currentPlayerIndex = advanceIndex(room, game, game.currentPlayerIndex, 1);
+  }
+
+  return { gameOver: false };
 };
 
 export interface LastPlayerStandingResult {

@@ -1,5 +1,6 @@
 import {
   type GameData,
+  type PlayerLeftResult,
   type PublicGameState,
   type RoomState,
   publicRoomState,
@@ -9,6 +10,7 @@ import {
   checkYatzyLastPlayerStanding,
   createIdleYatzyGame,
   publicYatzyGameState,
+  removeYatzyPlayer,
   startYatzyGame,
   type LastPlayerStandingResult,
 } from "@/server/yatzy/gameLogic";
@@ -16,18 +18,21 @@ import {
   checkShitheadLastPlayerStanding,
   createIdleShitheadGame,
   publicShitheadGameState,
+  removeShitheadPlayer,
   startShitheadGame,
 } from "@/server/shithead/gameLogic";
 import {
   checkOneCardLastPlayerStanding,
   createIdleOneCardGame,
   publicOneCardGameState,
+  removeOneCardPlayer,
   startOneCardGame,
 } from "@/server/onecard/gameLogic";
 import {
   checkHulaLastPlayerStanding,
   createIdleHulaGame,
   publicHulaGameState,
+  removeHulaPlayer,
   startHulaGame,
 } from "@/server/hula/gameLogic";
 
@@ -89,6 +94,22 @@ export const buildPublicRoomState = (
 ): PublicRoomState => {
   const game: PublicGameState = buildPublicGameState(room, forUserId);
   return publicRoomState(room, game);
+};
+
+/**
+ * 게임 도중 돌아오지 않은 사람을 판에서 빼는 처리를 게임 종류에 맞게 위임한다.
+ * @param room - 대상 방
+ * @param userId - 나간 게스트 id
+ * @returns 이 사람이 빠지면서 판이 끝났는지 여부
+ */
+export const removePlayerFromGame = (
+  room: RoomState,
+  userId: string,
+): PlayerLeftResult => {
+  if (room.game.type === "SHITHEAD") return removeShitheadPlayer(room, userId);
+  if (room.game.type === "ONECARD") return removeOneCardPlayer(room, userId);
+  if (room.game.type === "HULA") return removeHulaPlayer(room, userId);
+  return removeYatzyPlayer(room, userId);
 };
 
 /**

@@ -7,7 +7,12 @@ import {
   rollDice,
   totalScore,
 } from "@/utils/yatzy";
-import type { RoomState } from "@/server/roomManager";
+import {
+  removePlayer,
+  shiftTurnIndex,
+  type PlayerLeftResult,
+  type RoomState,
+} from "@/server/roomManager";
 import { YATZY_ROLL_COOLDOWN_MS } from "@/constants/yatzy";
 
 const TOTAL_TURNS = CATEGORIES.length;
@@ -150,6 +155,70 @@ export const toggleHold = (
   game.held[dieIndex] = !game.held[dieIndex];
 };
 
+/**
+ * 남은 사람이 모두 13턴을 다 썼으면 판을 끝내고 승자를 정한다. 야찌는 정확히
+ * 13턴제라 반복 야찌를 쌓는 턴도 턴 수에 포함돼, 항목이 남은 채로 턴이 끝날 수
+ * 있다 — 그런 항목은 0점으로 채워 게임이 멈추지 않게 한다.
+ * @param room - 대상 방
+ * @param game - 야찌 게임 상태
+ * @returns 판이 끝났으면 true
+ */
+const settleIfAllTurnsDone = (room: RoomState, game: YatzyGameData): boolean => {
+  const allDone = room.players.every((p) => game.turnsTaken[p.userId] >= TOTAL_TURNS);
+  if (!allDone) return false;
+
+  for (const p of room.players) {
+    const cards = game.scorecards[p.userId];
+    for (const cat of CATEGORIES) {
+      if (cards[cat] === null) cards[cat] = 0;
+    }
+  }
+
+  room.status = "FINISHED";
+  let [winner] = room.players;
+  for (const p of room.players) {
+    if (
+      totalScore(game.scorecards[p.userId]) > totalScore(game.scorecards[winner.userId])
+    ) {
+      winner = p;
+    }
+  }
+  game.winnerUserId = winner.userId;
+  return true;
+};
+
+/**
+ * 게임 도중 나간 사람을 점수판에서 지운다. 그 사람 차례였으면 굴리던 주사위를
+ * 초기화하고 다음 사람에게 넘긴다. 남은 사람들이 이미 13턴을 다 썼다면(나간
+ * 사람만 턴이 남아 있었던 경우) 그 자리에서 판을 끝낸다.
+ * @param room - 대상 방
+ * @param userId - 나간 게스트 id
+ * @returns 판이 끝났는지 여부
+ */
+export const removeYatzyPlayer = (room: RoomState, userId: string): PlayerLeftResult => {
+  const game = asYatzyGame(room);
+  const wasCurrent = currentPlayerId(room) === userId;
+
+  delete game.scorecards[userId];
+  delete game.turnsTaken[userId];
+
+  const removedIndex = removePlayer(room, userId);
+  game.currentPlayerIndex = shiftTurnIndex(
+    game.currentPlayerIndex,
+    removedIndex,
+    room.players.length,
+  );
+
+  if (wasCurrent) {
+    game.dice = [...INITIAL_DICE];
+    game.held = [...INITIAL_HELD];
+    game.rollsLeft = 3;
+    game.lastRolledAt = null;
+  }
+
+  return { gameOver: settleIfAllTurnsDone(room, game) };
+};
+
 export interface ScoreResult {
   finished: boolean;
   winnerUserId: string | null;
@@ -192,29 +261,8 @@ export const scoreCategory = (
   game.rollsLeft = 3;
   game.lastRolledAt = null;
 
-  // 야찌는 정확히 13턴제라, 반복 야찌를 쌓는 턴도 턴 수에 포함된다. 그래서
-  // 항목이 남은 채로 턴이 끝날 수 있는데, 그런 항목은 0점으로 채워 게임이
-  // 멈추지 않게 한다.
-  const allDone = room.players.every((p) => game.turnsTaken[p.userId] >= TOTAL_TURNS);
-
-  if (allDone) {
-    for (const p of room.players) {
-      const cards = game.scorecards[p.userId];
-      for (const cat of CATEGORIES) {
-        if (cards[cat] === null) cards[cat] = 0;
-      }
-    }
-    room.status = "FINISHED";
-    let [winner] = room.players;
-    for (const p of room.players) {
-      if (
-        totalScore(game.scorecards[p.userId]) > totalScore(game.scorecards[winner.userId])
-      ) {
-        winner = p;
-      }
-    }
-    game.winnerUserId = winner.userId;
-    return { finished: true, winnerUserId: winner.userId };
+  if (settleIfAllTurnsDone(room, game)) {
+    return { finished: true, winnerUserId: game.winnerUserId };
   }
 
   game.currentPlayerIndex = (game.currentPlayerIndex + 1) % room.players.length;
