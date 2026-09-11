@@ -98,6 +98,14 @@ const STALE_ROOM_AGE_MS = 60_000;
 // 전원이 나간 방을 이만큼 남겨 둔다. 방장이 잠깐 끊겼다 돌아오는 동안 방이
 // 사라지면 코드를 받아 들어오려던 사람들이 "없는 방"을 보게 된다.
 const EMPTY_ROOM_GRACE_MS = 180_000;
+// Render 무료 플랜은 15분간 외부 요청이 없으면 서버를 재운다. GitHub Actions
+// 예약 실행은 몇 시간씩 밀려 믿을 수 없어서, 서버가 직접 자기 공개 주소를
+// 두드린다 — 내부 localhost 호출은 Render 프록시를 안 거쳐 트래픽으로 안 친다.
+const SELF_PING_INTERVAL_MS = 10 * 60_000;
+// 무료 시간을 아끼려고 사람이 들어올 만한 한국시간 07:00~19:00에만 깨워 둔다.
+const SELF_PING_START_HOUR_KST = 7;
+const SELF_PING_END_HOUR_KST = 19;
+const KST_OFFSET_HOURS = 9;
 
 const port = parseInt(process.env.PORT || "3000", 10);
 const dev = process.env.NODE_ENV !== "production";
@@ -1124,6 +1132,18 @@ app.prepare().then(() => {
   }, STALE_ROOM_SWEEP_INTERVAL_MS);
 
   void clearRoomsFromPreviousRun();
+
+  // RENDER_EXTERNAL_URL은 Render가 자동으로 넣어 준다. 로컬에는 없으니 안 돈다.
+  const publicUrl = process.env.RENDER_EXTERNAL_URL;
+  if (publicUrl) {
+    setInterval(() => {
+      const hourKst = (new Date().getUTCHours() + KST_OFFSET_HOURS) % 24;
+      if (hourKst < SELF_PING_START_HOUR_KST || hourKst >= SELF_PING_END_HOUR_KST) return;
+      fetch(`${publicUrl}/api/health`).catch((err) =>
+        console.error("self ping failed", err),
+      );
+    }, SELF_PING_INTERVAL_MS);
+  }
 
   httpServer.listen(port, () => {
     console.log(`> Ready on http://localhost:${port}`);
