@@ -1,4 +1,9 @@
-import type { RoomState } from "@/server/roomManager";
+import {
+  removePlayer,
+  shiftTurnIndex,
+  type PlayerLeftResult,
+  type RoomState,
+} from "@/server/roomManager";
 import { HULA_DECK_DRAW_DELAY_MS, HULA_STOP_MAX_POINTS } from "@/constants/hula";
 import {
   createHulaDeck,
@@ -684,6 +689,48 @@ export const finalizeHulaGameOver = (room: RoomState): void => {
 export const hulaRankOf = (room: RoomState, userId: string): number => {
   const { ranks } = asHulaGame(room);
   return ranks?.[userId] ?? room.players.length;
+};
+
+/**
+ * 게임 도중 나간 사람을 판에서 뺀다. 손패는 섞어서 덱 맨 아래(배열 앞쪽 —
+ * 뽑기는 뒤에서 pop한다)로 되돌리고, 이미 바닥에 등록한 조합과 더미는 그대로
+ * 둔다. 그 사람 차례였으면 다음 사람의 차례를 새로 시작한다.
+ * @param room - 대상 방
+ * @param userId - 나간 게스트 id
+ * @returns 판이 끝났는지 여부 (훌라는 이탈만으로 끝나지 않는다)
+ */
+export const removeHulaPlayer = (room: RoomState, userId: string): PlayerLeftResult => {
+  const game = asHulaGame(room);
+  const wasCurrent = currentPlayerId(room, game) === userId;
+
+  game.deck = [...shuffle(game.hands[userId] ?? []), ...game.deck];
+  delete game.hands[userId];
+  if (game.thankYou?.playerId === userId) game.thankYou = null;
+
+  const removedIndex = removePlayer(room, userId);
+  game.currentPlayerIndex = shiftTurnIndex(
+    game.currentPlayerIndex,
+    removedIndex,
+    room.players.length,
+  );
+
+  if (wasCurrent) {
+    beginTurn(game, game.currentPlayerIndex);
+    return { gameOver: false };
+  }
+
+  // 남의 차례 중이라면 되돌릴 지점에도 나간 사람이 남아 있다 — 땡큐를 취소하면
+  // 그 사람 손패가 되살아나므로 스냅샷에서도 같이 지운다.
+  if (game.turnSnapshot) {
+    delete game.turnSnapshot.hands[userId];
+    game.turnSnapshot.currentPlayerIndex = shiftTurnIndex(
+      game.turnSnapshot.currentPlayerIndex,
+      removedIndex,
+      room.players.length,
+    );
+  }
+
+  return { gameOver: false };
 };
 
 export interface LastPlayerStandingResult {

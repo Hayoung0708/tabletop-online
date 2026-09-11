@@ -19,7 +19,7 @@ export interface JoinRouteContext {
 
 /**
  * 방에 참가한다. 이미 참가한 적 있으면 그대로 성공을 돌려주고, 정원이 찼거나
- * 이미 시작된 방이면 거부한다.
+ * 게임이 진행 중인 방이면 거부한다.
  * @param request - 닉네임이 담긴 요청
  * @param context - 라우트 파라미터 (방 코드)
  * @param context.params
@@ -63,8 +63,10 @@ export const POST = async (
       return NextResponse.json({ code: room.code });
     }
 
-    if (room.status !== "WAITING") {
-      return NextResponse.json({ error: "이미 시작된 게임입니다." }, { status: 409 });
+    // 끝난 방(FINISHED)은 막지 않는다 — 방 안 사람들은 결과 화면에서 바로 다시
+    // 시작할 수 있는데 새로 오는 사람만 영영 못 들어오면 안 된다.
+    if (room.status === "PLAYING") {
+      return NextResponse.json({ error: "게임이 진행 중입니다." }, { status: 409 });
     }
 
     if (room.players.length >= room.maxPlayers) {

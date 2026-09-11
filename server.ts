@@ -18,6 +18,7 @@ import {
   listRooms,
   reassignHostIfNeeded,
   removeDisconnectedPlayers,
+  reopenFinishedRoomForNewcomer,
   setConnected,
   updateRoomSettings,
   type RoomState,
@@ -26,6 +27,7 @@ import {
   buildPublicRoomState,
   checkLastPlayerStanding,
   createIdleGame,
+  removePlayerFromGame,
   startGameData,
 } from "@/server/gameDispatch";
 import {
@@ -88,7 +90,7 @@ interface SocketData {
 
 // 새로고침되면 소켓이 잠깐 끊겼다가 다시 붙는다. 재접속 유예 시간을 두어
 // 새로고침만으로 게임에서 튕겨나가지 않게 한다.
-const RECONNECT_GRACE_MS = 3_000;
+const RECONNECT_GRACE_MS = 5_000;
 // 만들어졌지만 아무도 들어오지 않은 방(생성자가 닉네임 입력 전 탭을 닫은 경우
 // 등)을 주기적으로 정리하는 간격.
 const STALE_ROOM_SWEEP_INTERVAL_MS = 30_000;
@@ -150,6 +152,20 @@ app.prepare().then(() => {
   };
 
   /**
+   * 판이 끝난 방을 DB에서 다시 입장할 수 있는 상태로 되돌린다. 방 안 사람들은
+   * 인메모리 FINISHED 덕에 결과 화면을 계속 보지만, 밖에서 코드로 들어오려는
+   * 사람에게는 대기 중인 방으로 보여야 한다 — DB를 FINISHED로 남겨 두면 끝난
+   * 방에는 아무도 못 들어오고 로비 목록에서도 사라진다.
+   * @param room - 대상 방
+   */
+  const reopenRoomAfterGame = async (room: RoomState): Promise<void> => {
+    await prisma.room.update({
+      where: { code: room.code },
+      data: { status: "WAITING", finishedAt: new Date() },
+    });
+  };
+
+  /**
    * 야찌 게임이 끝났을 때 각 플레이어의 최종 점수를 DB에 반영한다.
    * @param room - 대상 방 (game.type === "YATZY")
    */
@@ -163,10 +179,7 @@ app.prepare().then(() => {
         }),
       ),
     );
-    await prisma.room.update({
-      where: { code: room.code },
-      data: { status: "FINISHED", finishedAt: new Date() },
-    });
+    await reopenRoomAfterGame(room);
 
     // 야찌는 총점이 가장 높은 사람이 1등이다. 다만 아무도 점수를 못 낸 판은
     // 실제로 진행된 게임이 아니므로 승수를 주지 않는다 — 안 그러면 좌석
@@ -192,10 +205,7 @@ app.prepare().then(() => {
         }),
       ),
     );
-    await prisma.room.update({
-      where: { code: room.code },
-      data: { status: "FINISHED", finishedAt: new Date() },
-    });
+    await reopenRoomAfterGame(room);
 
     const [winner] = finishedOrder;
     if (winner) await awardWin(room, winner);
@@ -215,10 +225,7 @@ app.prepare().then(() => {
         }),
       ),
     );
-    await prisma.room.update({
-      where: { code: room.code },
-      data: { status: "FINISHED", finishedAt: new Date() },
-    });
+    await reopenRoomAfterGame(room);
 
     const winner = room.players.find((p) => oneCardRankOf(room, p.userId) === 1);
     if (winner) await awardWin(room, winner.userId);
@@ -254,10 +261,7 @@ app.prepare().then(() => {
         }),
       ),
     );
-    await prisma.room.update({
-      where: { code: room.code },
-      data: { status: "FINISHED", finishedAt: new Date() },
-    });
+    await reopenRoomAfterGame(room);
 
     if (room.game.winnerUserId) await awardWin(room, room.game.winnerUserId);
   };
@@ -364,11 +368,11 @@ app.prepare().then(() => {
   };
 
   /**
-   * 대기 중인 방에서 돌아오지 않은 사람을 목록에서 뺀다 — 남겨 두면 인원수와
-   * 시작 가능 여부가 부풀려진다.
+   * 게임이 돌아가고 있지 않은 방(대기 중이거나 결과 화면)에서 돌아오지 않은
+   * 사람을 목록에서 뺀다 — 남겨 두면 인원수와 시작 가능 여부가 부풀려진다.
    * @param room - 대상 방
    */
-  const dropDisconnectedFromWaitingRoom = async (room: RoomState): Promise<void> => {
+  const dropDisconnectedFromIdleRoom = async (room: RoomState): Promise<void> => {
     const removed = removeDisconnectedPlayers(room);
     if (removed.length === 0) return;
 
@@ -388,6 +392,65 @@ app.prepare().then(() => {
   };
 
   /**
+   * 이탈로 판이 끝나버린 경우(마지막까지 안 낸 사람이 한 명만 남거나, 야찌에서
+   * 남은 사람들이 이미 13턴을 다 쓴 경우) 결과 화면으로 넘기고 등수를 저장한다.
+   * @param room - 대상 방
+   */
+  const finishAbandonedGame = async (room: RoomState): Promise<void> => {
+    if (room.game.type === "SHITHEAD") {
+      finalizeGameOver(room);
+      await broadcastRoomState(room);
+      await persistShitheadResults(room);
+      return;
+    }
+    if (room.game.type === "ONECARD") {
+      finalizeOneCardGameOver(room);
+      await broadcastRoomState(room);
+      await persistOneCardResults(room);
+      return;
+    }
+    // 훌라는 이탈만으로 판이 끝나지 않아 여기까지 오지 않는다. 야찌는
+    // removeYatzyPlayer가 이미 FINISHED로 바꿔 놨으니 저장만 하면 된다.
+    if (room.game.type === "YATZY") await persistYatzyResults(room);
+  };
+
+  /**
+   * 진행 중인 게임에서 돌아오지 않은 사람을 빼고 남은 사람들끼리 계속 진행시킨다.
+   * 손패는 덱으로 돌아가고 등수·승수 기록에서도 빠진다. 한 사람을 빼면서 판이
+   * 끝나면 거기서 멈춘다 — 나머지 이탈자는 결과 화면(FINISHED)에서 정리된다.
+   * @param room - 대상 방
+   */
+  const dropLeaversFromRunningGame = async (room: RoomState): Promise<void> => {
+    const gone = room.players.filter((p) => !p.connected).map((p) => p.userId);
+    if (gone.length === 0) return;
+
+    const removed: string[] = [];
+    let gameOver = false;
+    for (const userId of gone) {
+      removed.push(userId);
+      if (removePlayerFromGame(room, userId).gameOver) {
+        gameOver = true;
+        break;
+      }
+    }
+
+    try {
+      await prisma.roomPlayer.deleteMany({
+        where: { roomId: room.dbId, playerId: { in: removed } },
+      });
+      await prisma.room.update({
+        where: { code: room.code },
+        data: { hostId: room.hostId },
+      });
+    } catch (err) {
+      console.error(err);
+    }
+
+    await broadcastRoomState(room);
+    if (gameOver) await finishAbandonedGame(room);
+  };
+
+  /**
    * 유예 시간이 지난 뒤에도 여전히 나간 상태인지 다시 확인하고 상황에 맞게
    * 정리한다. 타이머 설정 시점의 스냅샷이 아니라 지금 상태를 다시 조회하므로,
    * 그사이 재접속했으면 자연히 아무 일도 하지 않는다.
@@ -403,13 +466,17 @@ app.prepare().then(() => {
       return;
     }
 
-    if (room.status === "WAITING") {
-      await dropDisconnectedFromWaitingRoom(room);
+    if (room.status !== "PLAYING") {
+      await dropDisconnectedFromIdleRoom(room);
       return;
     }
 
-    const connectedCount = room.players.filter((p) => p.connected).length;
-    if (room.status !== "PLAYING" || connectedCount !== 1) return;
+    // 둘 이상 남았으면 나간 사람만 빼고 게임을 계속한다. 한 명만 남았을 때는
+    // 이길 상대가 없으므로 그 사람 승리로 정리하고 대기 방으로 되돌린다.
+    if (room.players.filter((p) => p.connected).length > 1) {
+      await dropLeaversFromRunningGame(room);
+      return;
+    }
 
     const standing = checkLastPlayerStanding(room);
     if (!standing) return;
@@ -554,6 +621,11 @@ app.prepare().then(() => {
             addPlayer(room, p.playerId, p.player.nickname ?? "플레이어", p.wins);
           }
         } else {
+          reopenFinishedRoomForNewcomer(
+            room,
+            socket.data.userId,
+            createIdleGame(room.game.type),
+          );
           // 닉네임은 소켓 핸드셰이크 때 박제된 값이 아니라 DB에서 다시 읽는다 —
           // 나갔다가 닉네임을 바꿔 들어와도 소켓이 재사용되면 옛 이름이 남는다.
           // 승수도 이 방에서 쌓은 것만 센다 (다른 방 기록은 따라오지 않는다).

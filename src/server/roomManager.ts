@@ -143,6 +143,26 @@ export const addPlayer = (
 };
 
 /**
+ * 끝난 판에 없던 사람이 들어오면 방을 대기 화면으로 되돌린다. 결과 화면은 판에
+ * 참가한 사람들의 기록만 갖고 있어서, 새 사람이 섞이면 점수표가 그 사람 칸을
+ * 찾지 못해 화면이 통째로 깨진다.
+ * @param room - 대상 방
+ * @param userId - 들어오는 게스트 id
+ * @param idleGame - 이 방 게임 종류의 초기 상태
+ */
+export const reopenFinishedRoomForNewcomer = (
+  room: RoomState,
+  userId: string,
+  idleGame: GameData,
+): void => {
+  if (room.status !== "FINISHED") return;
+  if (room.players.some((p) => p.userId === userId)) return;
+
+  room.status = "WAITING";
+  room.game = idleGame;
+};
+
+/**
  * 플레이어의 연결 상태를 갱신한다.
  * @param room - 대상 방
  * @param userId - 게스트 id
@@ -195,13 +215,14 @@ export const reassignHostIfNeeded = (room: RoomState): string | null => {
 };
 
 /**
- * 재접속하지 못한 플레이어를 방에서 뺀다. WAITING 상태에서만 의미가 있고,
- * 진행 중인 게임은 점수판을 유지하기 위해 그대로 목록에 남긴다.
+ * 재접속하지 못한 플레이어를 방에서 뺀다. 진행 중인 게임은 카드·차례까지
+ * 정리해야 해서 게임별 removeXPlayer가 따로 처리하고, 여기서는 대기 중이거나
+ * 끝난 방만 다룬다 — 끝난 방에 남아 있으면 다음 판 인원수가 부풀려진다.
  * @param room - 대상 방
  * @returns 제거된 플레이어들의 userId
  */
 export const removeDisconnectedPlayers = (room: RoomState): string[] => {
-  if (room.status !== "WAITING") return [];
+  if (room.status === "PLAYING") return [];
 
   const gone = room.players.filter((p) => !p.connected).map((p) => p.userId);
   if (gone.length === 0) return [];
@@ -211,6 +232,47 @@ export const removeDisconnectedPlayers = (room: RoomState): string[] => {
     .map((p, i) => ({ ...p, seat: i }));
 
   return gone;
+};
+
+export interface PlayerLeftResult {
+  /** 이 사람이 빠지면서 판이 끝났는지. */
+  gameOver: boolean;
+}
+
+/**
+ * 게임 도중 나간 사람을 참가자 목록에서 뺀다. 손패·차례 같은 게임별 정리는
+ * 호출하는 쪽(게임별 removeXPlayer)이 한다.
+ * @param room - 대상 방
+ * @param userId - 나간 게스트 id
+ * @returns 빠지기 전 자리 번호, 목록에 없던 사람이면 -1
+ */
+export const removePlayer = (room: RoomState, userId: string): number => {
+  const index = room.players.findIndex((p) => p.userId === userId);
+  if (index === -1) return -1;
+
+  room.players = room.players
+    .filter((p) => p.userId !== userId)
+    .map((p, seat) => ({ ...p, seat }));
+
+  return index;
+};
+
+/**
+ * 한 명이 빠진 뒤의 차례 인덱스를 보정한다. 나간 사람이 차례였으면 그 자리가
+ * 자연히 다음 사람을 가리키게 되고, 맨 끝자리였으면 처음으로 돌아간다.
+ * @param currentIndex - 빠지기 전 차례 인덱스
+ * @param removedIndex - 빠진 사람의 자리 번호
+ * @param remaining - 남은 인원수
+ * @returns 보정된 차례 인덱스
+ */
+export const shiftTurnIndex = (
+  currentIndex: number,
+  removedIndex: number,
+  remaining: number,
+): number => {
+  if (remaining === 0) return 0;
+  const shifted = currentIndex > removedIndex ? currentIndex - 1 : currentIndex;
+  return shifted % remaining;
 };
 
 /**

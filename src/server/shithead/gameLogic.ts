@@ -1,4 +1,9 @@
-import type { RoomState } from "@/server/roomManager";
+import {
+  removePlayer,
+  shiftTurnIndex,
+  type PlayerLeftResult,
+  type RoomState,
+} from "@/server/roomManager";
 import {
   type Card,
   type Rank,
@@ -485,6 +490,49 @@ export const pickUpPile = (room: RoomState, requesterId: string): number => {
   game.pile = [];
   game.currentPlayerIndex = findNextActiveIndex(room, game, game.currentPlayerIndex);
   return takenCount;
+};
+
+/**
+ * 게임 도중 나간 사람을 판에서 뺀다. 손패는 섞어서 덱 맨 아래(배열 앞쪽 —
+ * 뽑기는 뒤에서 pop한다)로 되돌리고, 이미 바닥에 내놓은 얼굴패·바닥패와 더미는
+ * 판 위에 남은 카드라 회수하지 않는다. 그 사람 차례였으면 다음 사람에게 넘긴다.
+ * @param room - 대상 방
+ * @param userId - 나간 게스트 id
+ * @returns 판이 끝났는지 여부
+ */
+export const removeShitheadPlayer = (
+  room: RoomState,
+  userId: string,
+): PlayerLeftResult => {
+  const game = asShitheadGame(room);
+
+  game.deck = [...shuffleCards(game.hands[userId] ?? []), ...game.deck];
+  delete game.hands[userId];
+  delete game.faceUp[userId];
+  delete game.faceDown[userId];
+  delete game.selectionDone[userId];
+  game.finishedOrder = game.finishedOrder.filter((id) => id !== userId);
+
+  const removedIndex = removePlayer(room, userId);
+  game.currentPlayerIndex = shiftTurnIndex(
+    game.currentPlayerIndex,
+    removedIndex,
+    room.players.length,
+  );
+
+  const stillPlaying = room.players.filter((p) => !game.finishedOrder.includes(p.userId));
+  if (stillPlaying.length <= 1) {
+    if (stillPlaying.length === 1) game.finishedOrder.push(stillPlaying[0].userId);
+    game.winnerUserId = game.finishedOrder[0] ?? null;
+    return { gameOver: true };
+  }
+
+  // 보정된 자리가 이미 완주한 사람을 가리킬 수 있다 — 그때는 다음 사람으로 민다.
+  if (game.finishedOrder.includes(room.players[game.currentPlayerIndex].userId)) {
+    game.currentPlayerIndex = findNextActiveIndex(room, game, game.currentPlayerIndex);
+  }
+
+  return { gameOver: false };
 };
 
 export interface LastPlayerStandingResult {
